@@ -76,22 +76,22 @@ function StatCounter({ stat, index }: { stat: StatItem; index: number }) {
       initial={{ opacity: 0, y: 20 }}
       animate={isInView ? { opacity: 1, y: 0 } : {}}
       transition={{ duration: 0.5, delay: index * 0.1 }}
-      className="p-6 rounded-2xl glass-panel relative flex flex-col justify-between hover:border-accent-gold/50 transition-colors"
+      className="p-6 rounded-2xl glass-panel bg-surface/80 relative flex flex-col justify-between hover:border-gold/50 transition-colors"
     >
       <div>
         <div className="flex items-baseline space-x-1">
-          <span className="font-serif text-5xl font-black text-accent-gold tracking-tight">
+          <span className="font-serif text-5xl font-black text-gold tracking-tight gold-glow">
             {count}%
           </span>
         </div>
-        <p className="text-sm text-text-secondary mt-2">
+        <p className="text-sm text-text-muted mt-2">
           {stat.label}{" "}
-          <strong className="text-text-primary font-bold text-base block mt-0.5">
+          <strong className="text-text font-bold text-base block mt-0.5">
             {stat.emphasis}
           </strong>
         </p>
       </div>
-      <p className="text-xs text-text-muted mt-4 border-t border-border-base pt-3">
+      <p className="text-xs text-text-muted mt-4 border-t border-border pt-3">
         {stat.context}
       </p>
     </motion.div>
@@ -100,19 +100,22 @@ function StatCounter({ stat, index }: { stat: StatItem; index: number }) {
 
 export function ResearchStats() {
   return (
-    <section className="py-20 px-4 max-w-7xl mx-auto relative">
+    <section className="py-24 px-4 max-w-7xl mx-auto relative z-20" id="scene-research">
       <div className="text-center max-w-3xl mx-auto mb-12">
-        <span className="text-xs font-semibold uppercase tracking-widest text-accent-gold">
+        <span className="text-xs font-semibold uppercase tracking-widest text-gold font-mono">
           Ground Truth • Community Engagement Study
         </span>
-        <h2 className="font-serif text-3xl md:text-4xl font-extrabold text-text-primary mt-2">
+        <h2 className="font-serif text-3xl md:text-4xl font-extrabold text-text mt-2">
           Why Traditional Diets Fail
         </h2>
-        <p className="text-sm md:text-base text-text-secondary mt-3">
-          Insights from our 50-respondent study in Pune across youth and students (aged 18–25).
-          Most people don&apos;t lack knowledge—taste and time dominate decisions.
+        <p className="text-sm md:text-base text-text-muted mt-3">
+          Insights from our 50-respondent survey in Pune across students and young professionals (aged 18–25).
+          Most people don&apos;t lack knowledge—taste and time dominate food choices.
         </p>
-        <GreekMeander className="mt-6 text-accent-gold/30 h-3 max-w-md mx-auto" />
+        <p className="text-[11px] text-text-muted font-mono mt-1 opacity-80">
+          Source: College CEP Survey &quot;Analysing Eating Habits &amp; Food Choices&quot;, Pune (n = 50).
+        </p>
+        <GreekMeander className="mt-6 text-gold/30 h-3 max-w-md mx-auto" />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
