@@ -119,6 +119,19 @@ class AmbrosiaDatabase extends Dexie {
       settings: "id",
       xpEvents: "id, type, timestamp",
     });
+
+    this.on("populate", () => {
+      this.settings.add({
+        id: "global",
+        theme: "auto",
+        reminderIntervalMinutes: 120,
+        quietHoursStart: "22:00",
+        quietHoursEnd: "07:00",
+        remindersEnabled: false,
+        soundEnabled: true,
+        units: "metric",
+      });
+    });
   }
 }
 

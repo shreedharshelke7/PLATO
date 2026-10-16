@@ -72,6 +72,8 @@ export default function MealScannerPage() {
   // API Key prompt if not configured
   const [showKeyInput, setShowKeyInput] = useState<boolean>(false);
   const [tempApiKey, setTempApiKey] = useState<string>("");
+  const [isVerifyingScanKey, setIsVerifyingScanKey] = useState<boolean>(false);
+  const [scanKeyError, setScanKeyError] = useState<string | null>(null);
 
   // Live Camera state
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -375,10 +377,33 @@ export default function MealScannerPage() {
   };
 
   const saveCustomApiKey = async () => {
-    if (!tempApiKey.trim()) return;
-    await updateSettings({ userApiKey: tempApiKey.trim() });
-    setShowKeyInput(false);
-    alert("Your Gemini API key has been securely saved in local IndexedDB!");
+    const key = tempApiKey.trim();
+    if (!key) return;
+    setIsVerifyingScanKey(true);
+    setScanKeyError(null);
+
+    try {
+      const res = await fetch("/api/health", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-key": key,
+        },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to verify key with Gemini API");
+      }
+
+      await updateSettings({ userApiKey: key });
+      setShowKeyInput(false);
+      setErrorMessage(null);
+      alert("Your Gemini API key has been verified and securely saved in local IndexedDB!");
+    } catch (err: unknown) {
+      setScanKeyError(err instanceof Error ? err.message : "Error verifying key");
+    } finally {
+      setIsVerifyingScanKey(false);
+    }
   };
 
   // Totals of currently scanned meal
@@ -483,11 +508,21 @@ export default function MealScannerPage() {
             />
             <button
               onClick={saveCustomApiKey}
-              className="px-4 py-2 bg-accent-gold text-stone-950 font-bold rounded-xl"
+              disabled={isVerifyingScanKey}
+              className="px-4 py-2 bg-accent-gold text-stone-950 font-bold rounded-xl flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
             >
-              Save Key
+              {isVerifyingScanKey ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> Verifying...
+                </>
+              ) : (
+                "Save Key"
+              )}
             </button>
           </div>
+          {scanKeyError && (
+            <p className="text-red-400 text-xs font-medium">{scanKeyError}</p>
+          )}
         </div>
       )}
 

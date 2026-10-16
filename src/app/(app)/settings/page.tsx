@@ -16,6 +16,8 @@ import {
   Trash2,
   Check,
   Heart,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 
 export default function SettingsPage() {
@@ -23,9 +25,15 @@ export default function SettingsPage() {
   const { profile, saveProfile } = useProfile();
   const { settings, updateSettings } = useSettings();
 
+
   // Custom API key state
   const [apiKeyInput, setApiKeyInput] = useState<string>(settings.userApiKey || "");
   const [keySaved, setKeySaved] = useState<boolean>(false);
+  const [isVerifyingKey, setIsVerifyingKey] = useState<boolean>(false);
+  const [keyVerificationResult, setKeyVerificationResult] = useState<{
+    success: boolean;
+    message: string;
+  } | null>(null);
 
   // Profile fields state
   const [name, setName] = useState(profile?.name || "");
@@ -35,10 +43,48 @@ export default function SettingsPage() {
   const [junkBudget, setJunkBudget] = useState(profile?.junkBudgetPerWeek ?? 3);
   const [profileSaved, setProfileSaved] = useState(false);
 
-  const handleSaveApiKey = async () => {
-    await updateSettings({ userApiKey: apiKeyInput.trim() });
-    setKeySaved(true);
-    setTimeout(() => setKeySaved(false), 2500);
+  const handleSaveAndTestApiKey = async () => {
+    const key = apiKeyInput.trim();
+    if (!key) {
+      await updateSettings({ userApiKey: "" });
+      setKeyVerificationResult({ success: true, message: "Custom API key cleared." });
+      setKeySaved(true);
+      setTimeout(() => setKeySaved(false), 2500);
+      return;
+    }
+
+    setIsVerifyingKey(true);
+    setKeyVerificationResult(null);
+
+    try {
+      const res = await fetch("/api/health", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-key": key,
+        },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to verify key with Gemini API");
+      }
+
+      await updateSettings({ userApiKey: key });
+      setKeySaved(true);
+      setKeyVerificationResult({
+        success: true,
+        message: "✓ Key is valid and connected to Gemini 2.5 Flash!",
+      });
+      setTimeout(() => setKeySaved(false), 3000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error verifying key";
+      setKeyVerificationResult({
+        success: false,
+        message: msg,
+      });
+    } finally {
+      setIsVerifyingKey(false);
+    }
   };
 
   const handleSaveProfile = async () => {
@@ -129,14 +175,39 @@ export default function SettingsPage() {
             className="flex-1 px-4 py-2.5 rounded-xl bg-bg-surface border border-border-base text-text-primary text-sm focus:border-accent-gold focus:outline-none"
           />
           <button
-            onClick={handleSaveApiKey}
-            className="px-6 py-2.5 rounded-xl bg-accent-gold hover:bg-accent-gold-hover text-stone-950 font-bold text-xs transition-all shadow-sm flex items-center gap-1.5"
+            onClick={handleSaveAndTestApiKey}
+            disabled={isVerifyingKey}
+            className="px-6 py-2.5 rounded-xl bg-accent-gold hover:bg-accent-gold-hover text-stone-950 font-bold text-xs transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
           >
-            {keySaved ? <Check className="w-4 h-4" /> : "Save Key"}
+            {isVerifyingKey ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" /> Verifying...
+              </>
+            ) : keySaved ? (
+              <>
+                <Check className="w-4 h-4" /> Saved &amp; Verified
+              </>
+            ) : (
+              "Save & Test Key"
+            )}
           </button>
         </div>
-        {keySaved && (
-          <p className="text-xs text-emerald-400 font-medium">Key updated successfully!</p>
+
+        {keyVerificationResult && (
+          <div
+            className={`p-3 rounded-xl border text-xs flex items-center gap-2 ${
+              keyVerificationResult.success
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                : "bg-red-500/10 border-red-500/30 text-red-400"
+            }`}
+          >
+            {keyVerificationResult.success ? (
+              <Check className="w-4 h-4 shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 shrink-0" />
+            )}
+            <span>{keyVerificationResult.message}</span>
+          </div>
         )}
       </section>
 

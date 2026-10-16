@@ -83,11 +83,7 @@ export const DEFAULT_SETTINGS: DBSettings = {
 export function useSettings() {
   const settings = useLiveQuery(async () => {
     const s = await db.settings.get("global");
-    if (!s) {
-      await db.settings.put(DEFAULT_SETTINGS);
-      return DEFAULT_SETTINGS;
-    }
-    return s;
+    return s ?? DEFAULT_SETTINGS;
   });
 
   const updateSettings = async (updates: Partial<DBSettings>) => {
