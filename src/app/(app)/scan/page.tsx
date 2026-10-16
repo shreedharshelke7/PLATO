@@ -51,7 +51,7 @@ interface ApiParsedItem {
 
 type ScanTab = "photo" | "barcode" | "search";
 
-export default function MealScannerPage() {
+function MealScannerContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialType = (searchParams.get("mealType") as MealType) || getMealTypeFromTime();
@@ -840,5 +840,19 @@ export default function MealScannerPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function MealScannerPage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <Loader2 className="w-8 h-8 animate-spin text-accent-gold" />
+        </div>
+      }
+    >
+      <MealScannerContent />
+    </React.Suspense>
   );
 }

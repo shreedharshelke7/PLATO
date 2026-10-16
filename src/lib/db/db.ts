@@ -6,6 +6,7 @@ export interface DBProfile extends UserProfileInput {
   targets: ComputedTargets;
   createdAt: number;
   updatedAt: number;
+  deleted?: boolean;
 }
 
 export type MealType = "breakfast" | "lunch" | "snack" | "dinner";
@@ -24,6 +25,8 @@ export interface DBMealItem {
   fiber_g: number;
   confidence?: number;
   source: "scanner" | "barcode" | "database" | "manual" | "swap";
+  updatedAt?: number;
+  deleted?: boolean;
 }
 
 export interface DBMeal {
@@ -38,6 +41,8 @@ export interface DBMeal {
   totalFiber: number;
   isJunkOrTreat?: boolean;
   createdAt: number;
+  updatedAt?: number;
+  deleted?: boolean;
 }
 
 export interface DBWaterLog {
@@ -45,6 +50,8 @@ export interface DBWaterLog {
   date: string; // YYYY-MM-DD
   amountMl: number;
   timestamp: number;
+  updatedAt?: number;
+  deleted?: boolean;
 }
 
 export interface DBWeightLog {
@@ -53,6 +60,8 @@ export interface DBWeightLog {
   weightKg: number;
   note?: string;
   timestamp: number;
+  updatedAt?: number;
+  deleted?: boolean;
 }
 
 export interface DBFavorite {
@@ -65,6 +74,8 @@ export interface DBFavorite {
   totalFat: number;
   totalFiber: number;
   createdAt: number;
+  updatedAt?: number;
+  deleted?: boolean;
 }
 
 export interface DBSettings {
@@ -77,6 +88,7 @@ export interface DBSettings {
   remindersEnabled: boolean;
   soundEnabled: boolean;
   units: "metric" | "imperial";
+  updatedAt?: number;
 }
 
 export type XPEventType =
@@ -95,9 +107,24 @@ export interface DBXPEvent {
   xp: number;
   description: string;
   timestamp: number;
+  updatedAt?: number;
+  deleted?: boolean;
 }
 
-class AmbrosiaDatabase extends Dexie {
+export const SYNCED_TABLES = [
+  "profile",
+  "meals",
+  "mealItems",
+  "waterLogs",
+  "weightLogs",
+  "favorites",
+  "xpEvents",
+  "settings",
+] as const;
+
+export type SyncedTableName = (typeof SYNCED_TABLES)[number];
+
+export class AmbrosiaDatabase extends Dexie {
   profile!: Table<DBProfile, string>;
   meals!: Table<DBMeal, string>;
   mealItems!: Table<DBMealItem, string>;
@@ -107,8 +134,10 @@ class AmbrosiaDatabase extends Dexie {
   settings!: Table<DBSettings, string>;
   xpEvents!: Table<DBXPEvent, string>;
 
-  constructor() {
-    super("ambrosia");
+  constructor(dbName = "ambrosia-guest") {
+    super(dbName);
+
+    // Version 1 (Baseline)
     this.version(1).stores({
       profile: "id",
       meals: "id, date, mealType, createdAt",
@@ -120,6 +149,53 @@ class AmbrosiaDatabase extends Dexie {
       xpEvents: "id, type, timestamp",
     });
 
+    // Version 2 (Cloud Sync & Soft Deletes)
+    this.version(2)
+      .stores({
+        profile: "id, updatedAt, deleted",
+        meals: "id, date, mealType, createdAt, updatedAt, deleted",
+        mealItems: "id, mealId, updatedAt, deleted",
+        waterLogs: "id, date, timestamp, updatedAt, deleted",
+        weightLogs: "id, date, timestamp, updatedAt, deleted",
+        favorites: "id, createdAt, updatedAt, deleted",
+        settings: "id, updatedAt",
+        xpEvents: "id, type, timestamp, updatedAt, deleted",
+      })
+      .upgrade(async (tx) => {
+        const now = Date.now();
+        await tx.table("profile").toCollection().modify((item: Record<string, unknown>) => {
+          if (item.updatedAt === undefined) item.updatedAt = item.createdAt || now;
+          if (item.deleted === undefined) item.deleted = false;
+        });
+        await tx.table("meals").toCollection().modify((item: Record<string, unknown>) => {
+          if (item.updatedAt === undefined) item.updatedAt = item.createdAt || now;
+          if (item.deleted === undefined) item.deleted = false;
+        });
+        await tx.table("mealItems").toCollection().modify((item: Record<string, unknown>) => {
+          if (item.updatedAt === undefined) item.updatedAt = now;
+          if (item.deleted === undefined) item.deleted = false;
+        });
+        await tx.table("waterLogs").toCollection().modify((item: Record<string, unknown>) => {
+          if (item.updatedAt === undefined) item.updatedAt = item.timestamp || now;
+          if (item.deleted === undefined) item.deleted = false;
+        });
+        await tx.table("weightLogs").toCollection().modify((item: Record<string, unknown>) => {
+          if (item.updatedAt === undefined) item.updatedAt = item.timestamp || now;
+          if (item.deleted === undefined) item.deleted = false;
+        });
+        await tx.table("favorites").toCollection().modify((item: Record<string, unknown>) => {
+          if (item.updatedAt === undefined) item.updatedAt = item.createdAt || now;
+          if (item.deleted === undefined) item.deleted = false;
+        });
+        await tx.table("xpEvents").toCollection().modify((item: Record<string, unknown>) => {
+          if (item.updatedAt === undefined) item.updatedAt = item.timestamp || now;
+          if (item.deleted === undefined) item.deleted = false;
+        });
+        await tx.table("settings").toCollection().modify((item: Record<string, unknown>) => {
+          if (item.updatedAt === undefined) item.updatedAt = now;
+        });
+      });
+
     this.on("populate", () => {
       this.settings.add({
         id: "global",
@@ -130,13 +206,85 @@ class AmbrosiaDatabase extends Dexie {
         remindersEnabled: false,
         soundEnabled: true,
         units: "metric",
+        updatedAt: Date.now(),
       });
     });
   }
 }
 
-// Global singleton instance
-export const db = new AmbrosiaDatabase();
+// Map of instantiated Dexie instances per user/guest
+const dbInstances = new Map<string, AmbrosiaDatabase>();
+
+let activeUserId: string | null = null;
+
+// Initialize active user from localStorage if available in browser
+if (typeof window !== "undefined") {
+  try {
+    const saved = localStorage.getItem("ambrosia_active_user");
+    if (saved) {
+      activeUserId = saved;
+    }
+  } catch {
+    // ignore localStorage restriction
+  }
+}
+
+export function getActiveUserId(): string | null {
+  return activeUserId;
+}
+
+export function setActiveUserId(userId: string | null): void {
+  activeUserId = userId;
+  if (typeof window !== "undefined") {
+    try {
+      if (userId) {
+        localStorage.setItem("ambrosia_active_user", userId);
+      } else {
+        localStorage.removeItem("ambrosia_active_user");
+      }
+    } catch {
+      // ignore
+    }
+  }
+}
+
+export function getDatabase(userId?: string | null): AmbrosiaDatabase {
+  const dbName = userId ? `ambrosia-${userId}` : "ambrosia-guest";
+  let instance = dbInstances.get(dbName);
+  if (!instance) {
+    instance = new AmbrosiaDatabase(dbName);
+    dbInstances.set(dbName, instance);
+  }
+  return instance;
+}
+
+export async function deleteDatabase(userId?: string | null): Promise<void> {
+  const dbName = userId ? `ambrosia-${userId}` : "ambrosia-guest";
+  const instance = dbInstances.get(dbName);
+  if (instance) {
+    await instance.delete();
+    dbInstances.delete(dbName);
+  } else {
+    const temp = new AmbrosiaDatabase(dbName);
+    await temp.delete();
+  }
+}
+
+/**
+ * Transparent singleton proxy.
+ * Calls to `db.meals`, `db.profile`, `db.transaction`, etc. resolve dynamically
+ * to whichever database is currently active (user or guest).
+ */
+export const db: AmbrosiaDatabase = new Proxy({} as AmbrosiaDatabase, {
+  get(_target, prop: string | symbol) {
+    const active = getDatabase(activeUserId);
+    const val = (active as unknown as Record<string | symbol, unknown>)[prop];
+    if (typeof val === "function") {
+      return (val as (...args: unknown[]) => unknown).bind(active);
+    }
+    return val;
+  },
+});
 
 // Helper to test if IndexedDB is available
 export async function isIndexedDBAvailable(): Promise<boolean> {
@@ -160,5 +308,43 @@ export async function isIndexedDBAvailable(): Promise<boolean> {
     });
   } catch {
     return false;
+  }
+}
+
+/**
+ * Migration helper: If user had an existing database under legacy "ambrosia"
+ * and "ambrosia-guest" is empty, copy over the records.
+ */
+export async function migrateLegacyDatabase(): Promise<void> {
+  if (typeof window === "undefined") return;
+  try {
+    const guestDb = getDatabase(null);
+    const guestMeals = await guestDb.meals.count();
+    if (guestMeals > 0) return; // Already has guest data
+
+    const legacyDb = new AmbrosiaDatabase("ambrosia");
+    const legacyCount = await legacyDb.meals.count().catch(() => 0);
+    if (legacyCount > 0) {
+      const [profile, meals, mealItems, waterLogs, weightLogs, favorites, xpEvents] =
+        await Promise.all([
+          legacyDb.profile.toArray(),
+          legacyDb.meals.toArray(),
+          legacyDb.mealItems.toArray(),
+          legacyDb.waterLogs.toArray(),
+          legacyDb.weightLogs.toArray(),
+          legacyDb.favorites.toArray(),
+          legacyDb.xpEvents.toArray(),
+        ]);
+
+      if (profile.length) await guestDb.profile.bulkPut(profile);
+      if (meals.length) await guestDb.meals.bulkPut(meals);
+      if (mealItems.length) await guestDb.mealItems.bulkPut(mealItems);
+      if (waterLogs.length) await guestDb.waterLogs.bulkPut(waterLogs);
+      if (weightLogs.length) await guestDb.weightLogs.bulkPut(weightLogs);
+      if (favorites.length) await guestDb.favorites.bulkPut(favorites);
+      if (xpEvents.length) await guestDb.xpEvents.bulkPut(xpEvents);
+    }
+  } catch {
+    // Non-fatal legacy migration
   }
 }

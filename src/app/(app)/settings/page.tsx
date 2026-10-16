@@ -2,8 +2,12 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { format } from "date-fns";
 import { useProfile, useSettings } from "@/lib/db/hooks";
-import { db } from "@/lib/db/db";
+import { useAuth } from "@/lib/supabase/hooks";
+import { useSyncStatus } from "@/lib/sync/syncEngine";
+import { deleteDatabase } from "@/lib/db/db";
 import { playWaterChime } from "@/lib/audio/chime";
 import {
   Settings as SettingsIcon,
@@ -18,13 +22,20 @@ import {
   Heart,
   Loader2,
   AlertCircle,
+  Cloud,
+  CloudOff,
+  RefreshCw,
+  LogOut,
+  LogIn,
+  Shield,
 } from "lucide-react";
 
 export default function SettingsPage() {
   const router = useRouter();
   const { profile, saveProfile } = useProfile();
   const { settings, updateSettings } = useSettings();
-
+  const { user, isConfigured, signOut } = useAuth();
+  const { status: syncStatus, lastSyncAt, errorMessage, syncNow, deleteCloudData } = useSyncStatus();
 
   // Custom API key state
   const [apiKeyInput, setApiKeyInput] = useState<string>(settings.userApiKey || "");
@@ -34,6 +45,11 @@ export default function SettingsPage() {
     success: boolean;
     message: string;
   } | null>(null);
+
+  // Cloud sync action states
+  const [isSyncingNow, setIsSyncingNow] = useState(false);
+  const [isDeletingCloud, setIsDeletingCloud] = useState(false);
+  const [cloudActionMessage, setCloudActionMessage] = useState<string | null>(null);
 
   // Profile fields state
   const [name, setName] = useState(profile?.name || "");
@@ -87,6 +103,39 @@ export default function SettingsPage() {
     }
   };
 
+  const handleManualSync = async () => {
+    setIsSyncingNow(true);
+    setCloudActionMessage(null);
+    try {
+      await syncNow();
+      setCloudActionMessage("Synchronized with Olympian Cloud!");
+      setTimeout(() => setCloudActionMessage(null), 3000);
+    } catch (err: unknown) {
+      setCloudActionMessage(err instanceof Error ? err.message : "Sync failed.");
+    } finally {
+      setIsSyncingNow(false);
+    }
+  };
+
+  const handleDeleteCloudData = async () => {
+    const confirmed = window.confirm(
+      "Are you sure you wish to delete your cloud backup from Supabase? Your device's local logs will remain intact."
+    );
+    if (!confirmed) return;
+
+    setIsDeletingCloud(true);
+    setCloudActionMessage(null);
+    try {
+      await deleteCloudData();
+      setCloudActionMessage("Cloud records successfully removed from Supabase.");
+      setTimeout(() => setCloudActionMessage(null), 3500);
+    } catch (err: unknown) {
+      setCloudActionMessage(err instanceof Error ? err.message : "Failed to delete cloud data.");
+    } finally {
+      setIsDeletingCloud(false);
+    }
+  };
+
   const handleSaveProfile = async () => {
     if (!profile) return;
     await saveProfile({
@@ -119,7 +168,7 @@ export default function SettingsPage() {
     );
     if (!confirm1) return;
 
-    await db.delete();
+    await deleteDatabase(user?.id ?? null);
     try {
       localStorage.clear();
     } catch {
@@ -140,11 +189,137 @@ export default function SettingsPage() {
           Settings & Divine Key
         </h1>
         <p className="text-xs sm:text-sm text-text-secondary">
-          Configure local preferences, theme aesthetics, circadian reminders, and API keys.
+          Configure local preferences, theme aesthetics, circadian reminders, cloud sync, and API keys.
         </p>
       </div>
 
-      {/* 1. GEMINI VISION API KEY CONFIGURATION */}
+      {/* 1. CLOUD SYNC & ACCOUNT */}
+      <section className="p-6 rounded-3xl glass-panel-gold space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-10 h-10 rounded-xl bg-accent-gold/20 flex items-center justify-center text-accent-gold">
+              <Cloud size={20} />
+            </div>
+            <div>
+              <h3 className="font-serif font-bold text-base text-text-primary">
+                Olympian Cloud Sync
+              </h3>
+              <span className="text-xs text-accent-gold font-mono">
+                Local-First • Realtime Supabase PostgreSQL Backup
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {user ? (
+              <span className="px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-semibold flex items-center gap-1.5">
+                <Shield className="w-3.5 h-3.5" />
+                <span>Protected Account</span>
+              </span>
+            ) : (
+              <span className="px-3 py-1 rounded-full bg-surface-glass border border-border-base text-text-muted text-xs font-semibold flex items-center gap-1.5">
+                <CloudOff className="w-3.5 h-3.5" />
+                <span>Guest Mode</span>
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Not Configured banner in Dev */}
+        {!isConfigured && (
+          <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-300 text-xs flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>
+              Supabase environment variables not configured. Ambrosia is operating in 100% offline guest mode.
+            </span>
+          </div>
+        )}
+
+        {/* Signed In details */}
+        {user ? (
+          <div className="space-y-4">
+            <div className="p-4 rounded-2xl bg-bg-surface border border-border-base flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div>
+                <p className="text-text-muted text-[11px] uppercase tracking-wider font-semibold">
+                  Active Account
+                </p>
+                <p className="text-sm font-bold text-text-primary mt-0.5">{user.email}</p>
+                <p className="text-[11px] text-text-secondary mt-1">
+                  Last Synced:{" "}
+                  {lastSyncAt ? format(new Date(lastSyncAt), "PPpp") : "Pending first sync"}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleManualSync}
+                  disabled={isSyncingNow || syncStatus === "syncing"}
+                  className="px-4 py-2 rounded-xl gold-shimmer bg-gradient-to-r from-accent-gold-light via-accent-gold to-accent-gold-deep text-bg-base font-bold text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw
+                    className={`w-3.5 h-3.5 ${isSyncingNow || syncStatus === "syncing" ? "animate-spin" : ""}`}
+                  />
+                  <span>Sync Now</span>
+                </button>
+
+                <button
+                  onClick={() => signOut()}
+                  className="px-3.5 py-2 rounded-xl border border-border-base text-text-secondary hover:text-text-primary text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Sign Out</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Cloud Action Message */}
+            {cloudActionMessage && (
+              <div className="p-3 rounded-xl bg-accent-gold/10 border border-accent-gold/30 text-accent-gold text-xs flex items-center gap-2">
+                <Check className="w-4 h-4" />
+                <span>{cloudActionMessage}</span>
+              </div>
+            )}
+
+            {errorMessage && (
+              <div className="p-3 rounded-xl bg-terracotta/10 border border-terracotta/30 text-terracotta text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4" />
+                <span>Sync Error: {errorMessage}</span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-xs text-text-muted">
+                Need to wipe your remote cloud backups without affecting this device?
+              </span>
+              <button
+                onClick={handleDeleteCloudData}
+                disabled={isDeletingCloud}
+                className="text-xs text-terracotta hover:underline font-semibold cursor-pointer disabled:opacity-50"
+              >
+                {isDeletingCloud ? "Purging cloud..." : "Delete My Cloud Data"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="p-4 rounded-2xl bg-bg-surface border border-border-base space-y-3">
+            <p className="text-xs text-text-secondary leading-relaxed">
+              Your meals, water logs, and progress live on this browser in IndexedDB. Sign in or create
+              an account to sync seamlessly between your phone, laptop, and tablet.
+            </p>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/login"
+                className="px-5 py-2.5 rounded-xl gold-shimmer bg-gradient-to-r from-accent-gold-light via-accent-gold to-accent-gold-deep text-bg-base font-bold text-xs flex items-center gap-2 cursor-pointer shadow-md"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>Sign In or Create Account</span>
+              </Link>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* 2. GEMINI VISION API KEY CONFIGURATION */}
       <section className="p-6 rounded-3xl glass-panel-gold space-y-4">
         <div className="flex items-center space-x-2.5">
           <div className="w-10 h-10 rounded-xl bg-accent-gold/20 flex items-center justify-center text-accent-gold">
@@ -155,15 +330,15 @@ export default function SettingsPage() {
               Personal Gemini API Key (Optional)
             </h3>
             <span className="text-xs text-accent-gold font-mono">
-              Stored 100% locally in IndexedDB • Never logged
+              Stored 100% locally in IndexedDB • Never synced to cloud
             </span>
           </div>
         </div>
 
         <p className="text-xs text-text-secondary leading-relaxed">
           The app functions out of the box with manual food logging and bundled offline databases.
-          To use Gemini 2.5 Flash Vision for meal photo scanning, paste your free key from Google AI Studio.
-          When present, Ambrosia transmits it in the secure <code>x-user-key</code> header.
+          To use Gemini 2.5 Flash Vision for unlimited meal photo scanning and bypass all server limits,
+          paste your free key from Google AI Studio.
         </p>
 
         <div className="flex gap-2">
@@ -211,7 +386,7 @@ export default function SettingsPage() {
         )}
       </section>
 
-      {/* 2. THEME SELECTION */}
+      {/* 3. THEME SELECTION */}
       <section className="p-6 rounded-3xl glass-panel space-y-4">
         <h3 className="font-serif font-bold text-base text-text-primary">
           Dynamic Deity Themes (400ms Transitions)
@@ -225,7 +400,10 @@ export default function SettingsPage() {
             { id: "amethyst", name: "Amethyst", icon: Sparkles, desc: "Tyrian Purple & Silver" },
           ].map((th) => {
             const Icon = th.icon;
-            const isSelected = settings.theme === th.id || (th.id === "obsidian" && settings.theme === "nyx") || (th.id === "marble" && settings.theme === "olympus");
+            const isSelected =
+              settings.theme === th.id ||
+              (th.id === "obsidian" && settings.theme === "nyx") ||
+              (th.id === "marble" && settings.theme === "olympus");
             return (
               <button
                 key={th.id}
@@ -253,7 +431,7 @@ export default function SettingsPage() {
         </div>
       </section>
 
-      {/* 3. PROFILE & TARGETS EDIT */}
+      {/* 4. PROFILE & TARGETS EDIT */}
       <section className="p-6 rounded-3xl glass-panel space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="font-serif font-bold text-base text-text-primary">
@@ -261,7 +439,7 @@ export default function SettingsPage() {
           </h3>
           <button
             onClick={handleSaveProfile}
-            className="px-4 py-1.5 rounded-xl bg-accent-gold text-stone-950 font-bold text-xs shadow-sm"
+            className="px-4 py-1.5 rounded-xl bg-accent-gold text-stone-950 font-bold text-xs shadow-sm cursor-pointer hover:bg-accent-gold-hover transition-colors"
           >
             {profileSaved ? "Saved!" : "Update Targets"}
           </button>
@@ -322,7 +500,7 @@ export default function SettingsPage() {
         </div>
       </section>
 
-      {/* 4. CIRCADIAN HYDRATION REMINDERS */}
+      {/* 5. CIRCADIAN HYDRATION REMINDERS */}
       <section className="p-6 rounded-3xl glass-panel space-y-4">
         <div className="flex items-center justify-between">
           <div>
@@ -337,7 +515,7 @@ export default function SettingsPage() {
 
           <button
             onClick={handleTestReminder}
-            className="px-3.5 py-1.5 rounded-xl border border-cyan-400/40 text-cyan-400 text-xs font-semibold hover:bg-cyan-500/10"
+            className="px-3.5 py-1.5 rounded-xl border border-cyan-400/40 text-cyan-400 text-xs font-semibold hover:bg-cyan-500/10 cursor-pointer"
           >
             Test Chime
           </button>
@@ -352,7 +530,7 @@ export default function SettingsPage() {
         </div>
       </section>
 
-      {/* 5. PURGE & DANGER ZONE */}
+      {/* 6. PURGE & DANGER ZONE */}
       <section className="p-6 rounded-3xl border border-red-500/30 bg-red-500/5 space-y-3">
         <div className="flex items-center gap-2 text-red-400 font-serif font-bold text-base">
           <Trash2 className="w-5 h-5" /> Danger Zone • Oblivion
@@ -363,7 +541,7 @@ export default function SettingsPage() {
         </p>
         <button
           onClick={handleDeleteAllData}
-          className="px-5 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold text-xs transition-colors"
+          className="px-5 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold text-xs transition-colors cursor-pointer"
         >
           Purge All Data & Restart
         </button>

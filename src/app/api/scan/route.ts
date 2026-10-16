@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
-  checkRateLimit,
+  checkAIAccessLimits,
   getGeminiConfig,
   createGeminiClient,
   cleanJsonOutput,
@@ -34,11 +34,12 @@ const ScanResponseSchema = z.object({
 export type ScanResponse = z.infer<typeof ScanResponseSchema>;
 
 export async function POST(req: NextRequest) {
-  // 1. Rate limit
-  if (!checkRateLimit(req)) {
+  // 1. Rate limit & Tiered abuse protection
+  const limitCheck = await checkAIAccessLimits(req);
+  if (!limitCheck.allowed) {
     return errorResponse(
-      "Rate limit exceeded. Please wait a moment before scanning again.",
-      "RATE_LIMIT_EXCEEDED",
+      limitCheck.message || "Rate limit exceeded.",
+      limitCheck.code || "RATE_LIMIT_EXCEEDED",
       429
     );
   }

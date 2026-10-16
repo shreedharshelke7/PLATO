@@ -3,14 +3,23 @@
 import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useProfile } from "@/lib/db/hooks";
+import { migrateLegacyDatabase } from "@/lib/db/db";
+import { triggerSync } from "@/lib/sync/syncEngine";
 import { AppSidebar } from "@/components/navigation/AppSidebar";
 import { AppHeader } from "@/components/navigation/AppHeader";
 import { MobileTabBar } from "@/components/navigation/MobileTabBar";
+import { ImportGuestDataDialog } from "@/components/auth/ImportGuestDataDialog";
 import { ZeusIcon } from "@/components/gods";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { profile, isLoading } = useProfile();
+
+  useEffect(() => {
+    // Check legacy database migration and initiate initial sync
+    migrateLegacyDatabase().catch(() => {});
+    triggerSync().catch(() => {});
+  }, []);
 
   useEffect(() => {
     // If done loading and no profile exists, guide to onboarding
@@ -46,6 +55,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Mobile Tab Bar */}
         <MobileTabBar />
       </div>
+
+      {/* Guest-to-Account Merge Dialog */}
+      <ImportGuestDataDialog />
     </div>
   );
 }

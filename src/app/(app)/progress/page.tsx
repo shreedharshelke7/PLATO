@@ -20,7 +20,7 @@ import {
 } from "recharts";
 import { useProfile, useWeight } from "@/lib/db/hooks";
 import { ApolloIcon, LaurelWreath } from "@/components/gods";
-import { db } from "@/lib/db/db";
+import { db, DBMeal, DBMealItem, DBWaterLog, DBWeightLog, DBFavorite } from "@/lib/db/db";
 import {
   Download,
   Upload,
@@ -104,12 +104,13 @@ export default function ProgressPage() {
 
   // Export to JSON
   const handleExportJSON = async () => {
-    const allMeals = await db.meals.toArray();
-    const allMealItems = await db.mealItems.toArray();
-    const allWater = await db.waterLogs.toArray();
-    const allWeight = await db.weightLogs.toArray();
-    const allFavs = await db.favorites.toArray();
-    const curProfile = await db.profile.get("current");
+    const allMeals = (await db.meals.toArray()).filter((m) => !m.deleted);
+    const allMealItems = (await db.mealItems.toArray()).filter((i) => !i.deleted);
+    const allWater = (await db.waterLogs.toArray()).filter((w) => !w.deleted);
+    const allWeight = (await db.weightLogs.toArray()).filter((w) => !w.deleted);
+    const allFavs = (await db.favorites.toArray()).filter((f) => !f.deleted);
+    const rawProfile = await db.profile.get("current");
+    const curProfile = rawProfile && !rawProfile.deleted ? rawProfile : null;
 
     const backup = {
       exportDate: new Date().toISOString(),
@@ -134,7 +135,7 @@ export default function ProgressPage() {
 
   // Export to CSV
   const handleExportCSV = async () => {
-    const allMeals = await db.meals.toArray();
+    const allMeals = (await db.meals.toArray()).filter((m) => !m.deleted);
     if (allMeals.length === 0) {
       alert("No meals recorded to export yet.");
       return;
@@ -184,12 +185,23 @@ export default function ProgressPage() {
         const raw = evt.target?.result as string;
         const data = JSON.parse(raw);
 
-        if (data.profile) await db.profile.put(data.profile);
-        if (data.meals) await db.meals.bulkPut(data.meals);
-        if (data.mealItems) await db.mealItems.bulkPut(data.mealItems);
-        if (data.waterLogs) await db.waterLogs.bulkPut(data.waterLogs);
-        if (data.weightLogs) await db.weightLogs.bulkPut(data.weightLogs);
-        if (data.favorites) await db.favorites.bulkPut(data.favorites);
+        const now = Date.now();
+        if (data.profile) await db.profile.put({ ...data.profile, updatedAt: now, deleted: false });
+        if (data.meals && Array.isArray(data.meals)) {
+          await db.meals.bulkPut(data.meals.map((m: DBMeal) => ({ ...m, updatedAt: now, deleted: false })));
+        }
+        if (data.mealItems && Array.isArray(data.mealItems)) {
+          await db.mealItems.bulkPut(data.mealItems.map((i: DBMealItem) => ({ ...i, updatedAt: now, deleted: false })));
+        }
+        if (data.waterLogs && Array.isArray(data.waterLogs)) {
+          await db.waterLogs.bulkPut(data.waterLogs.map((w: DBWaterLog) => ({ ...w, updatedAt: now, deleted: false })));
+        }
+        if (data.weightLogs && Array.isArray(data.weightLogs)) {
+          await db.weightLogs.bulkPut(data.weightLogs.map((w: DBWeightLog) => ({ ...w, updatedAt: now, deleted: false })));
+        }
+        if (data.favorites && Array.isArray(data.favorites)) {
+          await db.favorites.bulkPut(data.favorites.map((f: DBFavorite) => ({ ...f, updatedAt: now, deleted: false })));
+        }
 
         alert("Data successfully restored to Mount Olympus!");
         window.location.reload();

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
-  checkRateLimit,
+  checkAIAccessLimits,
   getGeminiConfig,
   createGeminiClient,
   cleanJsonOutput,
@@ -186,8 +186,13 @@ const FALLBACK_SWAPS: Record<string, SwapResponse> = {
 };
 
 export async function POST(req: NextRequest) {
-  if (!checkRateLimit(req)) {
-    return errorResponse("Rate limit exceeded", "RATE_LIMIT_EXCEEDED", 429);
+  const limitCheck = await checkAIAccessLimits(req);
+  if (!limitCheck.allowed) {
+    return errorResponse(
+      limitCheck.message || "Rate limit exceeded.",
+      limitCheck.code || "RATE_LIMIT_EXCEEDED",
+      429
+    );
   }
 
   const body = await req.json().catch(() => ({}));

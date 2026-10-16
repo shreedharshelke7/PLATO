@@ -16,6 +16,7 @@ import {
   isIndexedDBAvailable,
 } from "./db";
 import { UserProfileInput, calculateTargets } from "../nutrition/targets";
+import { notifyDataChanged } from "../sync/syncEngine";
 
 // Hook to check IndexedDB health / private mode
 export function useDBStatus() {
@@ -30,19 +31,23 @@ export function useDBStatus() {
 
 // Hook for User Profile
 export function useProfile() {
-  const profile = useLiveQuery(() => db.profile.get("current"));
-  const isLoading = profile === undefined;
+  const rawProfile = useLiveQuery(() => db.profile.get("current"));
+  const profile = rawProfile && !rawProfile.deleted ? rawProfile : null;
+  const isLoading = rawProfile === undefined;
 
   const saveProfile = async (input: UserProfileInput) => {
     const targets = calculateTargets(input);
+    const now = Date.now();
     const fullProfile: DBProfile = {
       ...input,
       id: "current",
       targets,
-      createdAt: profile?.createdAt ?? Date.now(),
-      updatedAt: Date.now(),
+      createdAt: profile?.createdAt ?? now,
+      updatedAt: now,
+      deleted: false,
     };
     await db.profile.put(fullProfile);
+    notifyDataChanged();
     return fullProfile;
   };
 
@@ -55,8 +60,10 @@ export function useProfile() {
         ...customTargets,
       },
       updatedAt: Date.now(),
+      deleted: false,
     };
     await db.profile.put(updated);
+    notifyDataChanged();
   };
 
   return {
@@ -78,6 +85,7 @@ export const DEFAULT_SETTINGS: DBSettings = {
   remindersEnabled: false,
   soundEnabled: true,
   units: "metric",
+  updatedAt: 0,
 };
 
 export function useSettings() {
@@ -88,8 +96,15 @@ export function useSettings() {
 
   const updateSettings = async (updates: Partial<DBSettings>) => {
     const current = settings ?? DEFAULT_SETTINGS;
-    const updated = { ...current, ...updates, id: "global" as const };
+    const updated = {
+      ...current,
+      ...updates,
+      id: "global" as const,
+      updatedAt: Date.now(),
+    };
     await db.settings.put(updated);
+    notifyDataChanged();
+
     if (updates.theme) {
       try {
         localStorage.setItem("ambrosia_theme", updates.theme);
@@ -124,11 +139,19 @@ export function useSettings() {
 
 // Hook for Meals for a given date
 export function useMeals(dateStr: string) {
-  const meals = useLiveQuery(() => db.meals.where("date").equals(dateStr).toArray(), [dateStr]);
+  const meals = useLiveQuery(
+    () => db.meals.where("date").equals(dateStr).filter((m) => !m.deleted).toArray(),
+    [dateStr]
+  );
+
   const mealItems = useLiveQuery(async () => {
     if (!meals || meals.length === 0) return [];
     const mealIds = meals.map((m) => m.id);
-    return db.mealItems.where("mealId").anyOf(mealIds).toArray();
+    return db.mealItems
+      .where("mealId")
+      .anyOf(mealIds)
+      .filter((item) => !item.deleted)
+      .toArray();
   }, [meals]);
 
   const addMeal = async (params: {
@@ -137,7 +160,8 @@ export function useMeals(dateStr: string) {
     items: Omit<DBMealItem, "id" | "mealId">[];
     isJunkOrTreat?: boolean;
   }) => {
-    const mealId = `meal_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const now = Date.now();
+    const mealId = `meal_${now}_${Math.random().toString(36).slice(2, 7)}`;
     const totalCalories = params.items.reduce((s, i) => s + i.calories, 0);
     const totalProtein = Number(params.items.reduce((s, i) => s + i.protein_g, 0).toFixed(1));
     const totalCarbs = Number(params.items.reduce((s, i) => s + i.carbs_g, 0).toFixed(1));
@@ -155,13 +179,17 @@ export function useMeals(dateStr: string) {
       totalFat,
       totalFiber,
       isJunkOrTreat: params.isJunkOrTreat,
-      createdAt: Date.now(),
+      createdAt: now,
+      updatedAt: now,
+      deleted: false,
     };
 
     const newItems: DBMealItem[] = params.items.map((item, idx) => ({
       ...item,
-      id: `item_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 5)}`,
+      id: `item_${now}_${idx}_${Math.random().toString(36).slice(2, 5)}`,
       mealId,
+      updatedAt: now,
+      deleted: false,
     }));
 
     await db.transaction("rw", db.meals, db.mealItems, db.xpEvents, async () => {
@@ -169,31 +197,50 @@ export function useMeals(dateStr: string) {
       await db.mealItems.bulkPut(newItems);
       // Award XP for logging a meal
       await db.xpEvents.put({
-        id: `xp_${Date.now()}`,
+        id: `xp_${now}`,
         type: params.isJunkOrTreat ? "swap" : "meal",
         xp: 10,
         description: `Logged ${newMeal.name}`,
-        timestamp: Date.now(),
+        timestamp: now,
+        updatedAt: now,
+        deleted: false,
       });
     });
 
+    notifyDataChanged();
     return newMeal;
   };
 
   const deleteMeal = async (mealId: string) => {
+    const now = Date.now();
     await db.transaction("rw", db.meals, db.mealItems, async () => {
-      await db.meals.delete(mealId);
-      const itemsToDelete = await db.mealItems.where("mealId").equals(mealId).toArray();
-      await db.mealItems.bulkDelete(itemsToDelete.map((i) => i.id));
+      await db.meals.update(mealId, { deleted: true, updatedAt: now });
+      const itemsToSoftDelete = await db.mealItems.where("mealId").equals(mealId).toArray();
+      if (itemsToSoftDelete.length > 0) {
+        await db.mealItems.bulkPut(
+          itemsToSoftDelete.map((i) => ({ ...i, deleted: true, updatedAt: now }))
+        );
+      }
     });
+    notifyDataChanged();
   };
 
   const copyYesterdayMeals = async (targetDateStr: string, yesterdayDateStr: string) => {
-    const yesterdayMeals = await db.meals.where("date").equals(yesterdayDateStr).toArray();
+    const yesterdayMeals = await db.meals
+      .where("date")
+      .equals(yesterdayDateStr)
+      .filter((m) => !m.deleted)
+      .toArray();
+
     if (!yesterdayMeals || yesterdayMeals.length === 0) return 0;
 
     for (const ym of yesterdayMeals) {
-      const items = await db.mealItems.where("mealId").equals(ym.id).toArray();
+      const items = await db.mealItems
+        .where("mealId")
+        .equals(ym.id)
+        .filter((i) => !i.deleted)
+        .toArray();
+
       await addMeal({
         mealType: ym.mealType,
         name: ym.name,
@@ -238,31 +285,37 @@ export function useMeals(dateStr: string) {
 // Hook for Water Logs
 export function useWater(dateStr: string) {
   const waterLogs = useLiveQuery(
-    () => db.waterLogs.where("date").equals(dateStr).toArray(),
+    () => db.waterLogs.where("date").equals(dateStr).filter((w) => !w.deleted).toArray(),
     [dateStr]
   );
 
   const totalWaterMl = waterLogs?.reduce((sum, item) => sum + item.amountMl, 0) ?? 0;
 
   const addWater = async (amountMl: number) => {
+    const now = Date.now();
     const log: DBWaterLog = {
-      id: `water_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      id: `water_${now}_${Math.random().toString(36).slice(2, 6)}`,
       date: dateStr,
       amountMl,
-      timestamp: Date.now(),
+      timestamp: now,
+      updatedAt: now,
+      deleted: false,
     };
     await db.waterLogs.put(log);
 
     // Award XP (+5 per 250-500ml)
     if (amountMl >= 250) {
       await db.xpEvents.put({
-        id: `xp_water_${Date.now()}`,
+        id: `xp_water_${now}`,
         type: "water",
         xp: 5,
         description: `Hydrated with ${amountMl} ml of water`,
-        timestamp: Date.now(),
+        timestamp: now,
+        updatedAt: now,
+        deleted: false,
       });
     }
+    notifyDataChanged();
     return log;
   };
 
@@ -270,7 +323,8 @@ export function useWater(dateStr: string) {
     if (!waterLogs || waterLogs.length === 0) return;
     const last = waterLogs.sort((a, b) => b.timestamp - a.timestamp)[0];
     if (last) {
-      await db.waterLogs.delete(last.id);
+      await db.waterLogs.update(last.id, { deleted: true, updatedAt: Date.now() });
+      notifyDataChanged();
     }
   };
 
@@ -285,9 +339,11 @@ export function useWater(dateStr: string) {
 
 // Hook for XP and Gamification
 export function useXP() {
-  const events = useLiveQuery(() => db.xpEvents.orderBy("timestamp").reverse().toArray());
-  const allMeals = useLiveQuery(() => db.meals.toArray());
-  const allWater = useLiveQuery(() => db.waterLogs.toArray());
+  const events = useLiveQuery(() =>
+    db.xpEvents.orderBy("timestamp").filter((e) => !e.deleted).reverse().toArray()
+  );
+  const allMeals = useLiveQuery(() => db.meals.filter((m) => !m.deleted).toArray());
+  const allWater = useLiveQuery(() => db.waterLogs.filter((w) => !w.deleted).toArray());
 
   const totalXP = events?.reduce((sum, e) => sum + e.xp, 0) ?? 0;
   const totalWaterLoggedMl = allWater?.reduce((sum, w) => sum + w.amountMl, 0) ?? 0;
@@ -342,13 +398,17 @@ export function useXP() {
   const totalSwapsLogged = allMeals?.filter((m) => m.isJunkOrTreat).length ?? 0;
 
   const awardXP = async (type: XPEventType, xp: number, description: string) => {
+    const now = Date.now();
     await db.xpEvents.put({
-      id: `xp_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+      id: `xp_${now}_${Math.random().toString(36).slice(2, 5)}`,
       type,
       xp,
       description,
-      timestamp: Date.now(),
+      timestamp: now,
+      updatedAt: now,
+      deleted: false,
     });
+    notifyDataChanged();
   };
 
   return {
@@ -364,22 +424,29 @@ export function useXP() {
 
 // Hook for Weight Logs
 export function useWeight() {
-  const weightLogs = useLiveQuery(() => db.weightLogs.orderBy("date").toArray());
+  const weightLogs = useLiveQuery(() =>
+    db.weightLogs.orderBy("date").filter((w) => !w.deleted).toArray()
+  );
 
   const addWeight = async (weightKg: number, dateStr: string, note?: string) => {
+    const now = Date.now();
     const log: DBWeightLog = {
-      id: `weight_${dateStr}_${Date.now()}`,
+      id: `weight_${dateStr}_${now}`,
       date: dateStr,
       weightKg,
       note,
-      timestamp: Date.now(),
+      timestamp: now,
+      updatedAt: now,
+      deleted: false,
     };
     await db.weightLogs.put(log);
+    notifyDataChanged();
     return log;
   };
 
   const deleteWeight = async (id: string) => {
-    await db.weightLogs.delete(id);
+    await db.weightLogs.update(id, { deleted: true, updatedAt: Date.now() });
+    notifyDataChanged();
   };
 
   return {
@@ -392,9 +459,12 @@ export function useWeight() {
 
 // Hook for Favorites
 export function useFavorites() {
-  const favorites = useLiveQuery(() => db.favorites.orderBy("createdAt").reverse().toArray());
+  const favorites = useLiveQuery(() =>
+    db.favorites.orderBy("createdAt").filter((f) => !f.deleted).reverse().toArray()
+  );
 
   const addFavorite = async (name: string, items: Omit<DBMealItem, "id" | "mealId">[]) => {
+    const now = Date.now();
     const totalCalories = items.reduce((s, i) => s + i.calories, 0);
     const totalProtein = Number(items.reduce((s, i) => s + i.protein_g, 0).toFixed(1));
     const totalCarbs = Number(items.reduce((s, i) => s + i.carbs_g, 0).toFixed(1));
@@ -402,7 +472,7 @@ export function useFavorites() {
     const totalFiber = Number(items.reduce((s, i) => s + i.fiber_g, 0).toFixed(1));
 
     const fav: DBFavorite = {
-      id: `fav_${Date.now()}`,
+      id: `fav_${now}`,
       name,
       items,
       totalCalories,
@@ -410,14 +480,18 @@ export function useFavorites() {
       totalCarbs,
       totalFat,
       totalFiber,
-      createdAt: Date.now(),
+      createdAt: now,
+      updatedAt: now,
+      deleted: false,
     };
     await db.favorites.put(fav);
+    notifyDataChanged();
     return fav;
   };
 
   const deleteFavorite = async (id: string) => {
-    await db.favorites.delete(id);
+    await db.favorites.update(id, { deleted: true, updatedAt: Date.now() });
+    notifyDataChanged();
   };
 
   return {

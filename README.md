@@ -1,154 +1,221 @@
 # PLATO / Ambrosia 🏛️ — "Fuel Like a God"
 
-> A production-grade, local-first nutrition & hydration progressive web application (PWA) inspired by ancient Greek deities and grounded in real-world public health research.
+> A production-ready, local-first nutrition & hydration progressive web application (PWA) upgraded with an **Obsidian & Aurum luxury palette**, a **cinematic philosopher scroll experience**, **local-first Supabase cloud synchronization**, and **tiered Gemini 2.5 Flash AI vision**. Grounded in empirical college Community Engagement Program (CEP) research from Pune, India.
 
 ---
 
-## 🏛️ 1. Project Overview & Research Origin
+## 🏛️ 1. High-Level Architecture
 
-Ambrosia was conceived and engineered as the practical translation of an empirical college **Community Engagement Program (CEP)** research study: *"Analysing Eating Habits & Food Choices"* (50 respondents, Pune, India, primarily students & young adults aged 18–25).
+Ambrosia is architected as an **offline-first, cloud-synchronized** progressive web application. Dexie (IndexedDB) acts as the single source of truth for all client-side UI rendering, while background synchronization transparently mirrors modifications to Supabase PostgreSQL when an account is connected.
 
-### Empirical Survey Findings
-* **80% eat fast food for taste and comfort**, regardless of nutritional awareness.
-* **50% cite lack of time and exhausting schedules** as their principal barrier to healthy eating.
-* **Only 38% consume breakfast daily**, leading to mid-day energy crashes and cravings.
-* **Only 34% eat fruits and vegetables daily**.
-* **64% are motivated and actively willing to transform their diet** if solutions respect their taste and busy lives.
-
----
-
-## ⚡ 2. The Core Differentiators
-
-### 🍇 1. The Divine Swap (Governed by Dionysus)
-Traditional diet apps scold users for craving pizza, samosas, or Maggi noodles. Ambrosia rejects moralizing diet culture:
-* **Taste-First Formulation**: Enter any junk food craving and receive **3 realistic, rapid swaps** (prepared in <10 minutes) that maintain the savory or sweet taste profile.
-* **Macro Delta Breakdown**: Clear comparisons showing exact caloric deficits, protein boosts, and fiber gains.
-* **Weekly Junk Budget**: Users configure their weekly treat allowance (e.g., 3 treats/week). If you choose to eat the original junk food, Ambrosia logs it against your budget with zero shame.
-
-### 🍛 2. Authentic Indian Food System
-* Bundled local food database featuring 125+ authentic Indian dishes (dal tadka, roti, phulka, paneer bhurji, poha, idli sambar, masala dosa, biryani, street chaat) alongside global staples.
-* Natural portion sizing in culturally intuitive units: **katori, roti, pieces, bowls, and grams**.
-* Offline-first NLP free-text parsing ("2 phulkas and a katori of dal").
-
-### 🛡️ 3. Absolute Privacy & Local-First Architecture
-* **Zero Mandatory Login**: All profile targets, meal logs, water intervals, and weight data live directly on the user's device in **IndexedDB (via Dexie)**.
-* **Custom API Key Support**: Users can supply their own Google Gemini API key in Settings, persisted strictly in local IndexedDB and dispatched via the `x-user-key` header to server route handlers. Keys are never logged or stored on any central server.
-
----
-
-## 🎨 3. Design System: Greek Gods & Dynamic Themes
-
-Ambrosia is styled around 7 Olympian deities, each governing a specific functional domain:
-* ⚡ **Zeus**: Throne room dashboard and daily Power Ring (caloric energy balance).
-* 🌾 **Demeter**: AI plate scanner and seasonal harvest meal log.
-* 🔱 **Poseidon**: Hydration tracking, amphora wave animations, and harmonic interval schedule.
-* 🪽 **Hermes**: Rapid quick-log shortcuts and meal presets.
-* 🦉 **Athena**: Strategic AI Coach, 1-Day Blueprints, and 5-minute kitchen solver.
-* 🏹 **Apollo**: Oracle progress analytics, weight trends, macro donuts, and streaks.
-* 🍇 **Dionysus**: Divine Swap alchemy and weekly Junk Budget.
-
-### Dynamic Deity Themes
-* `olympus` (Light): White marble textures, gold accents, and sky blue.
-* `poseidon` (Dark): Deep oceanic navy with aqua luminescent glow.
-* `nyx` (Dark): Near-black celestial purple with starlight silver.
-* `athena` (Muted): Ash slate, olive greens, and bronze owl-gold.
-* `auto` (Default Circadian): Automatically harmonizes with local solar time (06:00–17:00 Olympus, 17:00–20:00 Athena, 20:00–06:00 Nyx). An inline anti-FOUC script guarantees zero flash of unstyled theme on cold boot.
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        CLIENT LAYER (Next.js 16)                       │
+│                                                                        │
+│   Obsidian & Aurum Design System (WCAG AA Certified)                   │
+│   Cinematic Academy of Ambrosia (Lenis + Framer Motion + Web Speech)   │
+│   Reactive UI Hooks (Zustand + Dexie React Hooks)                      │
+└─────────────────────────────────┬──────────────────────────────────────┘
+                                  │ Direct Sub-millisecond Reads & Writes
+                                  ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                   LOCAL STORAGE LAYER (IndexedDB / Dexie v2)           │
+│                                                                        │
+│   • Database per user: `ambrosia-guest` or `ambrosia-${userId}`        │
+│   • Version 2 Schema: Soft-deletes (`deleted`) & `updatedAt` ms index  │
+│   • Automatic Legacy v1 -> v2 schema & data backfill                   │
+│   • Strictly local secrets: userApiKey is never sent to cloud          │
+└─────────────────────────────────┬──────────────────────────────────────┘
+                                  │ Debounced (1.5s) / Online / Tab-focus
+                                  ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                 BIDIRECTIONAL SYNC ENGINE (Local-First)                │
+│                                                                        │
+│   • Push: Local changes since lastSyncAt -> Supabase `user_data`       │
+│   • Pull: Remote changes since lastSyncAt -> Dexie tables              │
+│   • Conflict Resolution: Deterministic Last-Write-Wins (LWW)           │
+│   • Status Indicators: Synced, Syncing, Offline, Error Retry           │
+└──────────────────┬─────────────────────────────────┬───────────────────┘
+                   │ RLS Policy (auth.uid() = user_id)│
+                   ▼                                 ▼
+┌──────────────────────────────────────┐ ┌───────────────────────────────┐
+│       SUPABASE POSTGRESQL CLOUD      │ │   GEMINI 2.5 FLASH AI PIPELINE│
+│                                      │ │                               │
+│  • Row-Level Security (RLS)          │ │ • Vision Food Plate Scanner   │
+│  • `user_data` JSONB table           │ │ • Dionysus Divine Swap Engine │
+│  • Touch trigger for `updated_at`    │ │ • Athena Strategic AI Coach   │
+│  • Google OAuth + Magic Link Auth    │ │ • Tiered Abuse Limit Engine   │
+└──────────────────────────────────────┘ └───────────────────────────────┘
+```
 
 ---
 
-## 🛠️ 4. Technology Stack
+## 🔑 2. Environment Variables Reference
 
-* **Framework**: Next.js 16 (App Router with Turbopack), React 19 (Cache Components & Strict Mode).
-* **Language**: TypeScript (strict mode enabled with zero `any` compromises).
-* **Styling**: Tailwind CSS v4 with dynamic CSS variables and marble gradients.
-* **Animation**: Framer Motion scroll reveals, spring transitions, and interactive cards.
-* **Local-First Database**: Dexie (IndexedDB wrapper) with reactive `dexie-react-hooks`.
-* **State Management**: Zustand & Dexie live queries.
-* **Typography**: Google Fonts via `next/font` — **Cinzel** (headings) & **Inter** (body).
-* **Charts**: Recharts (Weight trendlines with goal reference, macro distribution donut).
-* **Vision & NLP**: `@google/genai` Gemini 2.5 Flash SDK executed **strictly** in Next.js server route handlers.
-* **Barcode Scanner**: `@zxing/browser` camera stream with Open Food Facts API integration.
-* **Audio**: Native Web Audio API harmonic celestial chime (zero external audio file dependencies).
-* **PWA**: Web App Manifest, Service Worker offline caching (`/sw.js`), and dynamic icon generation (`icon-192.png`, `icon-512.png`).
+Ambrosia gracefully degrades when API keys or credentials are not provided. The entire food database, manual logging, water amphora, and theme systems operate 100% offline without any keys.
+
+| Variable | Type | Required? | Example Value | Description |
+|---|---|---|---|---|
+| `GEMINI_API_KEY` | String | Optional | `AIzaSyD...` | Server-side Google Gemini 2.5 Flash API key for photo meal scanning, Divine Swap generation, and Athena AI coaching. |
+| `GEMINI_MODEL` | String | Optional | `gemini-2.5-flash` | The Gemini model identifier. Defaults to `gemini-2.5-flash`. |
+| `NEXT_PUBLIC_SUPABASE_URL` | String | Optional | `https://xyz.supabase.co` | Your Supabase project URL. If omitted, app runs in standalone guest mode. |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | String | Optional | `eyJhbGciOi...` | Supabase public anonymous API key for browser client authentication & sync. |
+
+> **Security Mandate**: Never prefix `GEMINI_API_KEY` with `NEXT_PUBLIC_`. Gemini keys are strictly invoked inside server route handlers (`/api/scan`, `/api/swap`, `/api/coach`, `/api/plan`, `/api/parse-meal`). Users may also supply their own key in **Settings**, stored strictly in local IndexedDB.
 
 ---
 
-## 🚀 5. Getting Started
+## ⚡ 3. Core Features & Research Origin
 
-### Prerequisites
-* Node.js 18.18+ or 20+
-* npm, pnpm, or yarn
+Ambrosia originated from an empirical **Community Engagement Program (CEP)** study (*"Analysing Eating Habits & Food Choices"*, 50 respondents in Pune, India, ages 18–25):
+* **80% eat fast food for taste**
+* **50% cite lack of time** as their primary obstacle
+* **Only 38% eat breakfast daily**
+* **Only 34% eat fruits & vegetables daily**
+* **64% are actively willing to transform their diet**
 
-### 1. Installation
-Clone the repository and install dependencies:
+### Key Capabilities
+1. **Divine Swap (Dionysus)**: Alchemical fast-food replacer that generates 3 high-protein, high-fiber alternatives under 10 minutes matching the taste profile of cravings (samosas, pizza, Maggi, street food).
+2. **Weekly Junk Budget**: Guilt-free treat budgeting without shaming.
+3. **Indian Food Intelligence**: 125+ regional Indian foods with portion sizing in katoris, rotis, and pieces.
+4. **Cinematic Landing Page ("The Academy of Ambrosia")**: 10 scroll-pinned scenes featuring 6 original Greek philosopher line-art SVGs (Plato, Aristotle, Socrates, Epicurus, Pythagoras, Heraclitus) with spoken Delphic maxims via the Web Speech API and gold dust particles.
+5. **Obsidian & Aurum Luxury System**: Dark luxury basalt with Aurum gold (`#D4AF37`), Ivory text, and five dynamic themes (`obsidian`, `marble`, `aegean`, `amethyst`, `auto`), with verified WCAG AA contrast.
+6. **Tiered AI Abuse Protection**:
+   * Guests: 5 scans/day per IP with friendly HTTP 429 sign-in prompt.
+   * Signed-in accounts: High burst allowances.
+   * Personal API keys (`x-user-key`): Unlimited usage bypassing server quotas.
+
+---
+
+## 🛠️ 4. Local Development Setup
+
+### 1. Clone & Install
 ```bash
+git clone <repository-url>
 cd ambrosia
 npm install
 ```
 
-### 2. Environment Variables
-Create a `.env.local` file in the root directory:
+### 2. Configure Environment Variables
+Copy `.env.example` to `.env.local`:
 ```bash
 cp .env.example .env.local
 ```
-Add your Google Gemini API Key:
+Fill in your credentials:
 ```env
-GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_API_KEY=your_gemini_api_key
 GEMINI_MODEL=gemini-2.5-flash
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
-> *Note:* The application compiles and runs seamlessly even without an API key! Manual food database search and local logging function completely offline.
 
 ### 3. Verification Suite
-Verify type-safety, linting rules, and mathematical targets:
+Run the rigorous verification suite before starting development:
 ```bash
-# Run Vitest unit tests (BMR, TDEE, Safety Floors, Food Search)
+# 1. Run all unit tests (Contrast ratios, redirect safety, LWW sync, nutrition targets)
 npm test
 
-# Run ESLint (React 19 & Next.js 16 compiler standards)
+# 2. Run ESLint (Strict Next.js & React 19 standards)
 npm run lint
 
-# Run strict TypeScript verification
+# 3. Type check
 npx tsc --noEmit
 
-# Test production build
+# 4. Production build test
 npm run build
 ```
 
-### 4. Development Server
-Run the local development server:
+### 4. Run Development Server
 ```bash
 npm run dev
 ```
-Navigate to [http://localhost:3000](http://localhost:3000) to view Ambrosia.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## 🚢 6. Deployment Guide
+## 🗄️ 5. Supabase Setup Guide
+
+### 1. Create a Supabase Project
+1. Log in to [supabase.com](https://supabase.com) and create a new project.
+2. Note your **Project URL** and **anon public API Key** under **Settings → API**.
+
+### 2. Execute Database Schema & RLS Policies
+Navigate to the **SQL Editor** in your Supabase dashboard and execute the contents of `supabase/schema.sql`:
+
+```sql
+-- Ambrosia PLATO V2 Cloud Sync Schema for Supabase
+create table if not exists public.user_data (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  table_name text not null,
+  record_id text not null,
+  payload jsonb not null,
+  client_updated_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  deleted boolean not null default false,
+  unique (user_id, table_name, record_id)
+);
+
+alter table public.user_data enable row level security;
+
+create policy "select own" on public.user_data for select using ((select auth.uid()) = user_id);
+create policy "insert own" on public.user_data for insert with check ((select auth.uid()) = user_id);
+create policy "update own" on public.user_data for update using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+create policy "delete own" on public.user_data for delete using ((select auth.uid()) = user_id);
+
+create index if not exists user_data_sync_idx on public.user_data (user_id, updated_at);
+create index if not exists user_data_lookup_idx on public.user_data (user_id, table_name, record_id);
+
+create or replace function public.touch_updated_at() returns trigger language plpgsql as $$
+begin
+  new.updated_at = now();
+  return new;
+end $$;
+
+drop trigger if exists user_data_touch on public.user_data;
+create trigger user_data_touch before insert or update on public.user_data
+for each row execute function public.touch_updated_at();
+```
+
+### 3. Configure Google OAuth (Optional)
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services → Credentials**.
+2. Create an **OAuth 2.0 Client ID** (Web application).
+3. Under **Authorized redirect URIs**, add your Supabase Auth callback URI:
+   `https://<your-project-ref>.supabase.co/auth/v1/callback`
+4. Copy the **Client ID** and **Client Secret**.
+5. In Supabase Dashboard, go to **Authentication → Providers → Google**, enable the provider, paste your Client ID and Client Secret, and save.
+6. Under **Authentication → URL Configuration**, add your application site URL (e.g. `http://localhost:3000` for local or `https://your-domain.vercel.app` for production).
+
+---
+
+## 🚢 6. Production Deployment Guide
 
 ### Deploying to Vercel (Recommended)
-1. Push your repository to GitHub / GitLab / Bitbucket.
-2. Import the project into the [Vercel Dashboard](https://vercel.com/new).
-3. Under **Environment Variables**, configure:
+1. Push your code to GitHub, GitLab, or Bitbucket.
+2. Go to [vercel.com/new](https://vercel.com/new) and import the repository.
+3. In **Settings → Environment Variables**, add:
    * `GEMINI_API_KEY`: Your Gemini API key.
    * `GEMINI_MODEL`: `gemini-2.5-flash`
-4. Click **Deploy**. Vercel will automatically run `npm run build` and provision serverless edge functions for the API routes.
+   * `NEXT_PUBLIC_SUPABASE_URL`: Your Supabase project URL.
+   * `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Your Supabase anon key.
+4. Click **Deploy**. Vercel will build and deploy the app with automatic edge caching and PWA service workers.
 
 ### Deploying to Netlify
 1. Connect your repository to [Netlify](https://app.netlify.com).
-2. Set the build command to `npm run build` and publish directory to `.next`.
-3. Install the Netlify Next.js runtime plugin (`@netlify/plugin-nextjs`).
-4. Add `GEMINI_API_KEY` and `GEMINI_MODEL` to your site settings environment variables.
+2. Set **Build command** to `npm run build` and **Publish directory** to `.next`.
+3. Add the `@netlify/plugin-nextjs` plugin if prompted.
+4. Configure the environment variables (`GEMINI_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`).
 
 ---
 
 ## 🩺 7. Medical & Nutritional Advisory
 
-Ambrosia is designed strictly for lifestyle, educational, and motivational tracking. It does not replace medical advice, clinical diagnosis, or individualized treatment plans from a certified dietitian or physician.
-* **Safety Floors Enforced**: Strict caloric minimums of 1,500 kcal (males) and 1,200 kcal (females).
-* **Underage & Underweight Protection**: Minors (<18 years) and individuals with BMI < 18.5 are prohibited from selecting fat-loss protocols and receive guidance to consult a medical professional.
+Ambrosia provides lifestyle, motivational, and educational tracking grounded in Mifflin-St Jeor metabolic equations. It is not clinical diagnostic software.
+* **Safety Caloric Floors**: Enforces minimum daily thresholds of 1,500 kcal for biological males and 1,200 kcal for biological females.
+* **Adolescent & Underweight Guards**: Minors (<18 years) and users with BMI < 18.5 are barred from aggressive weight-loss protocols and advised to consult clinical health practitioners.
 
 ---
 
-## 📜 8. License & Attribution
+## 📜 8. License
 
-Designed and developed for the college **Community Engagement Program (CEP)** research initiative. Licensed under the MIT License.
+MIT License. Developed for the Community Engagement Program (CEP) research initiative.
