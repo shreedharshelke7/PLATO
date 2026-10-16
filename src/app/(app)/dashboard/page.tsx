@@ -240,19 +240,19 @@ export default function DashboardPage() {
               label="Protein"
               consumed={totals.protein}
               target={targets.proteinG}
-              color="var(--accent-gold)"
+              color="var(--gold)"
             />
             <MacroRing
               label="Carbohydrates"
               consumed={totals.carbs}
               target={targets.carbsG}
-              color="#38bdf8"
+              color="var(--aegean)"
             />
             <MacroRing
               label="Healthy Fats"
               consumed={totals.fat}
               target={targets.fatG}
-              color="#c084fc"
+              color="var(--royal)"
             />
           </div>
 

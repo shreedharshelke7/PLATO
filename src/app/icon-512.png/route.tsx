@@ -8,14 +8,14 @@ export async function GET() {
         style={{
           width: "100%",
           height: "100%",
-          background: "radial-gradient(circle at center, #221645 0%, #090514 100%)",
+          background: "radial-gradient(circle at center, #1A1A24 0%, #0A0A0F 100%)",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          border: "16px solid #c89b3c",
+          border: "16px solid #D4AF37",
           borderRadius: "24%",
-          color: "#c89b3c",
+          color: "#D4AF37",
         }}
       >
         <div style={{ fontSize: 240 }}>⚡</div>

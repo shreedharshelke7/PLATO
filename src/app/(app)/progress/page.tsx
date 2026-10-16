@@ -88,9 +88,9 @@ export default function ProgressPage() {
 
   // Macro Split Data for Donut Chart
   const macroSplit = [
-    { name: "Protein", value: targets.proteinG * 4, color: "var(--accent-gold)" },
-    { name: "Carbs", value: targets.carbsG * 4, color: "#38bdf8" },
-    { name: "Fats", value: targets.fatG * 9, color: "#c084fc" },
+    { name: "Protein", value: targets.proteinG * 4, color: "var(--gold)" },
+    { name: "Carbs", value: targets.carbsG * 4, color: "var(--aegean)" },
+    { name: "Fats", value: targets.fatG * 9, color: "var(--royal)" },
   ];
 
   const handleSaveWeight = async () => {
@@ -354,9 +354,9 @@ export default function ProgressPage() {
                 {profile?.goalWeightKg && (
                   <ReferenceLine
                     y={profile.goalWeightKg}
-                    stroke="#10b981"
+                    stroke="var(--success)"
                     strokeDasharray="4 4"
-                    label={{ value: "Goal", fill: "#10b981", fontSize: 10 }}
+                    label={{ value: "Goal", fill: "var(--success)", fontSize: 10 }}
                   />
                 )}
                 <Line
@@ -416,7 +416,7 @@ export default function ProgressPage() {
             <h4 className="font-serif font-bold text-sm text-text-primary">
               Prebiotic Fiber Intake Trend
             </h4>
-            <span className="text-[10px] font-mono text-emerald-400">
+            <span className="text-[10px] font-mono text-success">
               Target: {targets.fiberG}g
             </span>
           </div>
@@ -436,11 +436,11 @@ export default function ProgressPage() {
                 />
                 <ReferenceLine
                   y={targets.fiberG}
-                  stroke="#10b981"
+                  stroke="var(--success)"
                   strokeDasharray="3 3"
-                  label={{ value: "Target", fill: "#10b981", fontSize: 10 }}
+                  label={{ value: "Target", fill: "var(--success)", fontSize: 10 }}
                 />
-                <Bar dataKey="fiber" fill="#10b981" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="fiber" fill="var(--success)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

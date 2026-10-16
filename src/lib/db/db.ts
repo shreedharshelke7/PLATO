@@ -69,7 +69,7 @@ export interface DBFavorite {
 
 export interface DBSettings {
   id: string; // "global"
-  theme: "auto" | "olympus" | "poseidon" | "nyx" | "athena";
+  theme: "auto" | "obsidian" | "marble" | "aegean" | "amethyst" | "olympus" | "poseidon" | "nyx" | "athena";
   userApiKey?: string;
   reminderIntervalMinutes: number;
   quietHoursStart: string; // "22:00"

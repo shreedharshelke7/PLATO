@@ -95,9 +95,16 @@ export function useSettings() {
         localStorage.setItem("ambrosia_theme", updates.theme);
         if (updates.theme === "auto") {
           const hour = new Date().getHours();
-          const autoTheme =
-            hour >= 6 && hour < 17 ? "olympus" : hour >= 17 && hour < 20 ? "athena" : "nyx";
+          const autoTheme = hour >= 6 && hour < 18 ? "marble" : "obsidian";
           document.documentElement.setAttribute("data-theme", autoTheme);
+        } else if (updates.theme === "olympus") {
+          document.documentElement.setAttribute("data-theme", "marble");
+        } else if (updates.theme === "poseidon") {
+          document.documentElement.setAttribute("data-theme", "aegean");
+        } else if (updates.theme === "nyx") {
+          document.documentElement.setAttribute("data-theme", "obsidian");
+        } else if (updates.theme === "athena") {
+          document.documentElement.setAttribute("data-theme", "amethyst");
         } else {
           document.documentElement.setAttribute("data-theme", updates.theme);
         }

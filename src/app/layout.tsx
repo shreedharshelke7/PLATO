@@ -36,7 +36,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
-  themeColor: "#c89b3c",
+  themeColor: "#0A0A0F",
 };
 
 import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
@@ -58,17 +58,28 @@ export default function RootLayout({
             __html: `
               (function() {
                 try {
+                  var path = window.location.pathname || '';
+                  if (path === '/' || path.startsWith('/login') || path.startsWith('/signup') || path.startsWith('/auth')) {
+                    document.documentElement.setAttribute('data-theme', 'obsidian');
+                    return;
+                  }
                   var stored = localStorage.getItem('ambrosia_theme');
                   var theme = stored || 'auto';
                   if (theme === 'auto') {
                     var hour = new Date().getHours();
-                    if (hour >= 6 && hour < 17) theme = 'olympus';
-                    else if (hour >= 17 && hour < 20) theme = 'athena';
-                    else theme = 'nyx';
+                    theme = (hour >= 6 && hour < 18) ? 'marble' : 'obsidian';
+                  } else if (theme === 'olympus') {
+                    theme = 'marble';
+                  } else if (theme === 'poseidon') {
+                    theme = 'aegean';
+                  } else if (theme === 'nyx') {
+                    theme = 'obsidian';
+                  } else if (theme === 'athena') {
+                    theme = 'amethyst';
                   }
                   document.documentElement.setAttribute('data-theme', theme);
                 } catch (e) {
-                  document.documentElement.setAttribute('data-theme', 'olympus');
+                  document.documentElement.setAttribute('data-theme', 'obsidian');
                 }
               })();
             `,

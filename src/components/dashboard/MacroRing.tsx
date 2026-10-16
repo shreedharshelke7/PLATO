@@ -98,7 +98,7 @@ export function FiberBar({
       </div>
       <div className="w-full bg-border-base/50 h-2 rounded-full overflow-hidden">
         <div
-          className="bg-emerald-500 h-full rounded-full transition-all duration-800"
+          className="bg-success h-full rounded-full transition-all duration-800"
           style={{ width: `${percent}%` }}
         />
       </div>

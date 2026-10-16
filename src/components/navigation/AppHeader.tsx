@@ -13,14 +13,24 @@ export function AppHeader() {
   const { rank } = getRankFromXP(totalXP);
 
   const cycleTheme = () => {
-    const themes: Array<"auto" | "olympus" | "poseidon" | "nyx" | "athena"> = [
+    const themes: Array<"auto" | "obsidian" | "marble" | "aegean" | "amethyst"> = [
       "auto",
-      "olympus",
-      "poseidon",
-      "nyx",
-      "athena",
+      "obsidian",
+      "marble",
+      "aegean",
+      "amethyst",
     ];
-    const nextIdx = (themes.indexOf(settings.theme) + 1) % themes.length;
+    const currentNorm =
+      settings.theme === "olympus"
+        ? "marble"
+        : settings.theme === "poseidon"
+        ? "aegean"
+        : settings.theme === "nyx"
+        ? "obsidian"
+        : settings.theme === "athena"
+        ? "amethyst"
+        : (settings.theme as "auto" | "obsidian" | "marble" | "aegean" | "amethyst");
+    const nextIdx = (themes.indexOf(currentNorm) + 1) % themes.length;
     updateSettings({ theme: themes[nextIdx] });
   };
 
@@ -76,14 +86,14 @@ export function AppHeader() {
           aria-label="Cycle theme"
           className="p-1.5 rounded-lg border border-border-base glass-panel text-text-secondary hover:text-text-primary hover:border-accent-gold/40 transition-all cursor-pointer"
         >
-          {settings.theme === "olympus" ? (
+          {settings.theme === "marble" || settings.theme === "olympus" ? (
             <Sun className="w-4 h-4 text-accent-gold" />
-          ) : settings.theme === "poseidon" ? (
+          ) : settings.theme === "aegean" || settings.theme === "poseidon" ? (
             <Compass className="w-4 h-4 text-cyan-400" />
-          ) : settings.theme === "nyx" ? (
-            <Moon className="w-4 h-4 text-purple-400" />
-          ) : settings.theme === "athena" ? (
-            <Sparkles className="w-4 h-4 text-lime-400" />
+          ) : settings.theme === "amethyst" || settings.theme === "athena" ? (
+            <Sparkles className="w-4 h-4 text-purple-400" />
+          ) : settings.theme === "obsidian" || settings.theme === "nyx" ? (
+            <Moon className="w-4 h-4 text-amber-300" />
           ) : (
             <Sparkles className="w-4 h-4 text-accent-gold" />
           )}

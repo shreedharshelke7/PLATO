@@ -218,21 +218,21 @@ export default function SettingsPage() {
         </h3>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {[
-            { id: "auto", name: "Auto Circadian", icon: Sparkles, desc: "06-17 Olympus, 17-20 Athena, 20-06 Nyx" },
-            { id: "olympus", name: "Olympus (Light)", icon: Sun, desc: "White marble & gold" },
-            { id: "poseidon", name: "Poseidon (Dark)", icon: Compass, desc: "Deep oceanic navy & aqua" },
-            { id: "nyx", name: "Nyx (Dark)", icon: Moon, desc: "Near-black celestial purple" },
-            { id: "athena", name: "Athena (Muted)", icon: Sparkles, desc: "Ash slate & olive gold" },
+            { id: "auto", name: "Auto Circadian", icon: Sparkles, desc: "06-18 Marble, 18-06 Obsidian" },
+            { id: "obsidian", name: "Obsidian", icon: Moon, desc: "Dark Basalt & Aurum Gold" },
+            { id: "marble", name: "Marble", icon: Sun, desc: "Ivory Stone & Warm Bronze" },
+            { id: "aegean", name: "Aegean", icon: Compass, desc: "Oceanic Teal & Gold Glow" },
+            { id: "amethyst", name: "Amethyst", icon: Sparkles, desc: "Tyrian Purple & Silver" },
           ].map((th) => {
             const Icon = th.icon;
-            const isSelected = settings.theme === th.id;
+            const isSelected = settings.theme === th.id || (th.id === "obsidian" && settings.theme === "nyx") || (th.id === "marble" && settings.theme === "olympus");
             return (
               <button
                 key={th.id}
                 type="button"
                 onClick={() =>
                   updateSettings({
-                    theme: th.id as "auto" | "olympus" | "poseidon" | "nyx" | "athena",
+                    theme: th.id as "auto" | "obsidian" | "marble" | "aegean" | "amethyst",
                   })
                 }
                 className={`p-3.5 rounded-2xl border text-left transition-all ${

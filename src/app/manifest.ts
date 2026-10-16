@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "AI-powered nutrition, smart hydration, and Divine Swaps for mortals and Olympians.",
     start_url: "/dashboard",
     display: "standalone",
-    background_color: "#0a0614",
-    theme_color: "#c89b3c",
+    background_color: "#0A0A0F",
+    theme_color: "#0A0A0F",
     orientation: "portrait-primary",
     icons: [
       {

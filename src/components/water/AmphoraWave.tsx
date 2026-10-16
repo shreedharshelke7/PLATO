@@ -34,8 +34,8 @@ export function AmphoraWave({ currentMl, targetMl, size = 260 }: AmphoraWaveProp
           </clipPath>
 
           <linearGradient id="water-gradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.85" />
-            <stop offset="100%" stopColor="#0284c7" stopOpacity="0.95" />
+            <stop offset="0%" stopColor="#1F6F78" stopOpacity="0.9" />
+            <stop offset="100%" stopColor="#0B1E28" stopOpacity="0.98" />
           </linearGradient>
 
           <linearGradient id="amphora-glass-glare" x1="0" y1="0" x2="1" y2="1">
