@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { format, addDays, subDays } from "date-fns";
 import { useMeals, useProfile, useFavorites } from "@/lib/db/hooks";
@@ -16,9 +16,14 @@ import {
 } from "lucide-react";
 
 export default function MealLogPage() {
-  const [currentDate, setCurrentDate] = useState<Date>(new Date());
-  const dateStr = format(currentDate, "yyyy-MM-dd");
-  const yesterdayDateStr = format(subDays(currentDate, 1), "yyyy-MM-dd");
+  const [currentDate, setCurrentDate] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setCurrentDate(new Date());
+  }, []);
+
+  const dateStr = currentDate ? format(currentDate, "yyyy-MM-dd") : "";
+  const yesterdayDateStr = currentDate ? format(subDays(currentDate, 1), "yyyy-MM-dd") : "";
 
   const { profile } = useProfile();
   const { meals, mealItems, totals, deleteMeal, copyYesterdayMeals, addMeal } =
@@ -35,8 +40,8 @@ export default function MealLogPage() {
     fiberG: 29,
   };
 
-  const handlePrevDay = () => setCurrentDate((d) => subDays(d, 1));
-  const handleNextDay = () => setCurrentDate((d) => addDays(d, 1));
+  const handlePrevDay = () => setCurrentDate((d) => (d ? subDays(d, 1) : subDays(new Date(), 1)));
+  const handleNextDay = () => setCurrentDate((d) => (d ? addDays(d, 1) : addDays(new Date(), 1)));
 
   const handleCopyYesterday = async () => {
     const copiedCount = await copyYesterdayMeals(dateStr, yesterdayDateStr);
@@ -134,7 +139,7 @@ export default function MealLogPage() {
               Day Totals vs Olympian Targets
             </h3>
             <span className="text-xs text-text-muted">
-              {format(currentDate, "EEEE, MMMM d, yyyy")}
+              {currentDate ? format(currentDate, "EEEE, MMMM d, yyyy") : ""}
             </span>
           </div>
           <div className="flex items-center gap-2">

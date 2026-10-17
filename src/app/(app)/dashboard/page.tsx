@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { useProfile, useMeals, useWater, useXP } from "@/lib/db/hooks";
@@ -23,8 +23,14 @@ import {
 } from "lucide-react";
 
 export default function DashboardPage() {
-  const todayStr = format(new Date(), "yyyy-MM-dd");
-  const [selectedDate, setSelectedDate] = useState<string>(todayStr);
+  const [selectedDate, setSelectedDate] = useState<string>("");
+  const [todayStr, setTodayStr] = useState<string>("");
+
+  useEffect(() => {
+    const today = format(new Date(), "yyyy-MM-dd");
+    setTodayStr(today);
+    setSelectedDate(today);
+  }, []);
 
   const { profile } = useProfile();
   const { meals, totals, addMeal, deleteMeal } = useMeals(selectedDate);

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { format, subDays, eachDayOfInterval } from "date-fns";
 import {
   LineChart,
@@ -33,11 +33,16 @@ export default function ProgressPage() {
 
   const [timeRange, setTimeRange] = useState<7 | 30>(7);
   const [newWeight, setNewWeight] = useState<string>("");
-  const [weightDate, setWeightDate] = useState<string>(
-    new Date().toISOString().split("T")[0]
-  );
+  const [weightDate, setWeightDate] = useState<string>("");
+  const [todayStr, setTodayStr] = useState<string>("");
   const [weightNote, setWeightNote] = useState<string>("");
   const [showWeightModal, setShowWeightModal] = useState<boolean>(false);
+
+  useEffect(() => {
+    const today = new Date().toISOString().split("T")[0];
+    setTodayStr(today);
+    setWeightDate(today);
+  }, []);
 
   const targets = useMemo(
     () =>
@@ -54,10 +59,11 @@ export default function ProgressPage() {
 
   // Generate date points for charts based on timeRange (last 7 or 30 days)
   const chartDates = useMemo(() => {
-    const end = new Date();
+    if (!todayStr) return [];
+    const end = new Date(todayStr);
     const start = subDays(end, timeRange - 1);
     return eachDayOfInterval({ start, end }).map((d) => format(d, "yyyy-MM-dd"));
-  }, [timeRange]);
+  }, [timeRange, todayStr]);
 
   // Aggregate mock & real data for the range
   const chartData = useMemo(() => {

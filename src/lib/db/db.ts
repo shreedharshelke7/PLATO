@@ -319,21 +319,28 @@ export async function migrateLegacyDatabase(): Promise<void> {
   if (typeof window === "undefined") return;
   try {
     const guestDb = getDatabase(null);
-    const guestMeals = await guestDb.meals.count();
-    if (guestMeals > 0) return; // Already has guest data
+    const [guestProfile, guestMeals] = await Promise.all([
+      guestDb.profile.get("current").catch(() => null),
+      guestDb.meals.count().catch(() => 0),
+    ]);
+    if (guestProfile || guestMeals > 0) return; // Already has guest data
 
     const legacyDb = new AmbrosiaDatabase("ambrosia");
-    const legacyCount = await legacyDb.meals.count().catch(() => 0);
-    if (legacyCount > 0) {
+    const [legacyProfile, legacyCount] = await Promise.all([
+      legacyDb.profile.get("current").catch(() => null),
+      legacyDb.meals.count().catch(() => 0),
+    ]);
+
+    if (legacyProfile || legacyCount > 0) {
       const [profile, meals, mealItems, waterLogs, weightLogs, favorites, xpEvents] =
         await Promise.all([
-          legacyDb.profile.toArray(),
-          legacyDb.meals.toArray(),
-          legacyDb.mealItems.toArray(),
-          legacyDb.waterLogs.toArray(),
-          legacyDb.weightLogs.toArray(),
-          legacyDb.favorites.toArray(),
-          legacyDb.xpEvents.toArray(),
+          legacyDb.profile.toArray().catch(() => []),
+          legacyDb.meals.toArray().catch(() => []),
+          legacyDb.mealItems.toArray().catch(() => []),
+          legacyDb.waterLogs.toArray().catch(() => []),
+          legacyDb.weightLogs.toArray().catch(() => []),
+          legacyDb.favorites.toArray().catch(() => []),
+          legacyDb.xpEvents.toArray().catch(() => []),
         ]);
 
       if (profile.length) await guestDb.profile.bulkPut(profile);
@@ -344,7 +351,7 @@ export async function migrateLegacyDatabase(): Promise<void> {
       if (favorites.length) await guestDb.favorites.bulkPut(favorites);
       if (xpEvents.length) await guestDb.xpEvents.bulkPut(xpEvents);
     }
-  } catch {
-    // Non-fatal legacy migration
+  } catch (err) {
+    console.warn("Legacy migration notice:", err);
   }
 }

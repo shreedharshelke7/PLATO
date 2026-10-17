@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useProfile, useMeals, useSettings } from "@/lib/db/hooks";
 import { AthenaIcon } from "@/components/gods";
 import {
@@ -52,7 +52,12 @@ interface QuickRecipe {
 export default function MealPlanPage() {
   const { profile } = useProfile();
   const { settings } = useSettings();
-  const { addMeal } = useMeals(new Date().toISOString().split("T")[0]);
+  const [todayStr, setTodayStr] = useState<string>("");
+  const { addMeal } = useMeals(todayStr);
+
+  useEffect(() => {
+    setTodayStr(new Date().toISOString().split("T")[0]);
+  }, []);
 
   const [activeTab, setActiveTab] = useState<"blueprint" | "kitchen">("blueprint");
 

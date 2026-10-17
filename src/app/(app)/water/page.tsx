@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { useWater, useProfile, useSettings } from "@/lib/db/hooks";
 import { calculateWaterSchedule, WaterSlot } from "@/lib/nutrition/targets";
@@ -18,7 +18,12 @@ import {
 } from "lucide-react";
 
 export default function HydrationPage() {
-  const todayStr = format(new Date(), "yyyy-MM-dd");
+  const [todayStr, setTodayStr] = useState<string>("");
+
+  useEffect(() => {
+    setTodayStr(format(new Date(), "yyyy-MM-dd"));
+  }, []);
+
   const { profile } = useProfile();
   const { updateSettings } = useSettings();
   const { waterLogs, totalWaterMl, addWater, undoWater } = useWater(todayStr);

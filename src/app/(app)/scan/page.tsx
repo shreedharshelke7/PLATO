@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { useMeals, useSettings } from "@/lib/db/hooks";
@@ -54,13 +54,22 @@ type ScanTab = "photo" | "barcode" | "search";
 function MealScannerContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const initialType = (searchParams.get("mealType") as MealType) || getMealTypeFromTime();
 
-  const { addMeal } = useMeals(new Date().toISOString().split("T")[0]);
+  const [todayStr, setTodayStr] = useState<string>("");
+  const { addMeal } = useMeals(todayStr);
   const { settings, updateSettings } = useSettings();
 
   const [activeTab, setActiveTab] = useState<ScanTab>("photo");
-  const [selectedMealType, setSelectedMealType] = useState<MealType>(initialType);
+  const [selectedMealType, setSelectedMealType] = useState<MealType>(
+    (searchParams.get("mealType") as MealType) || "lunch"
+  );
+
+  useEffect(() => {
+    setTodayStr(new Date().toISOString().split("T")[0]);
+    if (!searchParams.get("mealType")) {
+      setSelectedMealType(getMealTypeFromTime());
+    }
+  }, [searchParams]);
 
   // Editable Meal Items (Human in the loop)
   const [dishName, setDishName] = useState<string>("Harvest Feast");

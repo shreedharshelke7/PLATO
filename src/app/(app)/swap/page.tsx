@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useProfile, useMeals, useSettings, useXP } from "@/lib/db/hooks";
 import { DionysusIcon, LaurelWreath } from "@/components/gods";
@@ -19,8 +19,13 @@ export default function DivineSwapPage() {
   const router = useRouter();
   const { profile } = useProfile();
   const { settings } = useSettings();
-  const { addMeal } = useMeals(new Date().toISOString().split("T")[0]);
+  const [todayStr, setTodayStr] = useState<string>("");
+  const { addMeal } = useMeals(todayStr);
   const { totalSwapsLogged, awardXP } = useXP();
+
+  useEffect(() => {
+    setTodayStr(new Date().toISOString().split("T")[0]);
+  }, []);
 
   const [cravingInput, setCravingInput] = useState<string>("Samosa");
   const [isAlchemizing, setIsAlchemizing] = useState<boolean>(false);

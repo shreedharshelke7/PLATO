@@ -31,7 +31,14 @@ export function useDBStatus() {
 
 // Hook for User Profile
 export function useProfile() {
-  const rawProfile = useLiveQuery(() => db.profile.get("current"));
+  const rawProfile = useLiveQuery(
+    async () => {
+      const p = await db.profile.get("current");
+      return p ?? null;
+    },
+    [],
+    undefined
+  );
   const profile = rawProfile && !rawProfile.deleted ? rawProfile : null;
   const isLoading = rawProfile === undefined;
 
@@ -351,13 +358,18 @@ export function useXP() {
   // Compute streaks
   const uniqueDates = Array.from(new Set(allMeals?.map((m) => m.date) ?? [])).sort().reverse();
 
-  let streakDays = 0;
-  const now = new Date();
-  const todayStr = now.toISOString().split("T")[0];
-  const yesterdayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-  const yesterday = yesterdayDate.toISOString().split("T")[0];
+  const [dateInfo, setDateInfo] = useState({ todayStr: "", yesterday: "" });
 
-  if (uniqueDates.includes(todayStr) || uniqueDates.includes(yesterday)) {
+  useEffect(() => {
+    const now = new Date();
+    const today = now.toISOString().split("T")[0];
+    const yesterdayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    const yStr = yesterdayDate.toISOString().split("T")[0];
+    setDateInfo({ todayStr: today, yesterday: yStr });
+  }, []);
+
+  let streakDays = 0;
+  if (dateInfo.todayStr && (uniqueDates.includes(dateInfo.todayStr) || uniqueDates.includes(dateInfo.yesterday))) {
     let checkDate = new Date(uniqueDates[0]);
     streakDays = 1;
     for (let i = 1; i < uniqueDates.length; i++) {
@@ -378,7 +390,7 @@ export function useXP() {
   const breakfastMeals = allMeals?.filter((m) => m.mealType === "breakfast") ?? [];
   const breakfastDates = Array.from(new Set(breakfastMeals.map((m) => m.date))).sort().reverse();
   let breakfastStreak = 0;
-  if (breakfastDates.includes(todayStr) || breakfastDates.includes(yesterday)) {
+  if (dateInfo.todayStr && (breakfastDates.includes(dateInfo.todayStr) || breakfastDates.includes(dateInfo.yesterday))) {
     let checkDate = new Date(breakfastDates[0]);
     breakfastStreak = 1;
     for (let i = 1; i < breakfastDates.length; i++) {
