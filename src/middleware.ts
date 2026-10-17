@@ -11,9 +11,6 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
-  // Check guest cookie
-  const isGuest = request.cookies.get("ambrosia_guest")?.value === "true";
-
   // If Supabase is not configured, allow guest mode for all routes
   if (!isSupabaseConfigured()) {
     return response;
@@ -51,30 +48,13 @@ export async function middleware(request: NextRequest) {
 
   const isAuthRoute =
     pathname.startsWith("/login") || pathname.startsWith("/signup");
-  const isProtectedRoute = [
-    "/dashboard",
-    "/scan",
-    "/log",
-    "/water",
-    "/swap",
-    "/plan",
-    "/progress",
-    "/coach",
-    "/settings",
-  ].some((route) => pathname === route || pathname.startsWith(`${route}/`));
 
   // If user is signed in and visits /login or /signup, redirect to /dashboard
   if (user && isAuthRoute) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  // If visiting protected route without auth and without guest mode, redirect to /login
-  if (isProtectedRoute && !user && !isGuest) {
-    const redirectUrl = new URL("/login", request.url);
-    redirectUrl.searchParams.set("next", pathname);
-    return NextResponse.redirect(redirectUrl);
-  }
-
+  // Protect no routes! Guest mode is a first-class citizen and can visit every page.
   return response;
 }
 
