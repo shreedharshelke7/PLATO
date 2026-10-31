@@ -2,12 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
   checkAIAccessLimits,
-  getGeminiConfig,
-  createGeminiClient,
-  generateContentWithFallback,
   cleanJsonOutput,
   errorResponse,
 } from "@/lib/gemini/server";
+import { getAIConfig, generateTextCompletion } from "@/lib/ai/provider";
 
 export const maxDuration = 30;
 
@@ -65,13 +63,12 @@ export async function POST(req: NextRequest) {
   const profile = body.profile || {};
   const ingredients = body.ingredients || []; // for quick_meals
 
-  const { apiKey, model } = getGeminiConfig(req);
+  const aiConfig = getAIConfig(req, "text");
 
   // 1. QUICK MEALS MODE ("What's in my kitchen?")
   if (mode === "quick_meals") {
-    if (apiKey) {
+    if (aiConfig && aiConfig.apiKey) {
       try {
-        const ai = createGeminiClient(apiKey);
         const prompt = `You are Athena. The user has these ingredients in their kitchen: ${ingredients.join(", ") || "Eggs, bread, onion, curd, spices"}.
 Generate 3 quick, delicious Indian-friendly recipes that take UNDER 10 MINUTES to prepare (addressing the 50% lack of time barrier).
 
@@ -90,8 +87,8 @@ Return raw JSON strictly conforming to this schema without markdown fences:
     }
   ]
 }`;
-        const response = await generateContentWithFallback(ai, model, { contents: prompt });
-        const cleaned = cleanJsonOutput(response.text || "");
+        const text = await generateTextCompletion({ config: aiConfig, prompt });
+        const cleaned = cleanJsonOutput(text);
         const parsed = JSON.parse(cleaned);
         const validated = QuickMealsResponseSchema.parse(parsed);
         return NextResponse.json(validated);
@@ -150,9 +147,8 @@ Return raw JSON strictly conforming to this schema without markdown fences:
   };
   const diet = profile.diet || "veg";
 
-  if (apiKey) {
+  if (aiConfig && aiConfig.apiKey) {
     try {
-      const ai = createGeminiClient(apiKey);
       const prompt = `You are Athena, creator of optimal nutritional strategies.
 Generate a balanced 1-day Indian-friendly meal plan tailored to these targets:
 - Energy Target: ${targets.calories} kcal (aim for ±5%)
@@ -211,8 +207,8 @@ Return raw JSON strictly conforming to this schema without markdown:
   ]
 }`;
 
-      const response = await ai.models.generateContent({ model, contents: prompt });
-      const cleaned = cleanJsonOutput(response.text || "");
+      const text = await generateTextCompletion({ config: aiConfig, prompt });
+      const cleaned = cleanJsonOutput(text);
       const parsed = JSON.parse(cleaned);
       const validated = DailyPlanResponseSchema.parse(parsed);
 

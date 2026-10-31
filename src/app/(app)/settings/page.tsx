@@ -83,14 +83,14 @@ export default function SettingsPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "Failed to verify key with Gemini API");
+        throw new Error(data.error || "Failed to verify key with AI provider");
       }
 
       await updateSettings({ userApiKey: key });
       setKeySaved(true);
       setKeyVerificationResult({
         success: true,
-        message: "✓ Key is valid and connected to Gemini 2.5 Flash!",
+        message: data.message || "✓ Key is valid and connected successfully!",
       });
       setTimeout(() => setKeySaved(false), 3000);
     } catch (err: unknown) {
@@ -320,7 +320,7 @@ export default function SettingsPage() {
         )}
       </section>
 
-      {/* 2. GEMINI VISION API KEY CONFIGURATION */}
+      {/* 2. AI API KEY CONFIGURATION (GROQ OR GEMINI) */}
       <section className="p-6 rounded-3xl glass-panel-gold space-y-4">
         <div className="flex items-center space-x-2.5">
           <div className="w-10 h-10 rounded-xl bg-accent-gold/20 flex items-center justify-center text-accent-gold">
@@ -328,7 +328,7 @@ export default function SettingsPage() {
           </div>
           <div>
             <h3 className="font-serif font-bold text-base text-text-primary">
-              Personal Gemini API Key (Optional)
+              Personal AI API Key (Groq or Gemini)
             </h3>
             <span className="text-xs text-accent-gold font-mono">
               Stored 100% locally in IndexedDB • Never synced to cloud
@@ -338,8 +338,8 @@ export default function SettingsPage() {
 
         <p className="text-xs text-text-secondary leading-relaxed">
           The app functions out of the box with manual food logging and bundled offline databases.
-          To use Gemini 2.5 Flash Vision for unlimited meal photo scanning and bypass all server limits,
-          paste your free key from Google AI Studio.
+          To use ultra-fast <strong>Groq LPU (Llama 3.2 Vision / Llama 3.3 70B)</strong> or <strong>Gemini Flash Vision</strong> for unlimited meal photo scanning and bypass all limits,
+          paste your free key from <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer" className="text-accent-gold underline">Groq Cloud</a> or <a href="https://aistudio.google.com" target="_blank" rel="noopener noreferrer" className="text-accent-gold underline">Google AI Studio</a>.
         </p>
 
         <div className="flex gap-2">
@@ -347,7 +347,7 @@ export default function SettingsPage() {
             type="password"
             value={apiKeyInput}
             onChange={(e) => setApiKeyInput(e.target.value)}
-            placeholder="AIzaSy..."
+            placeholder="gsk_... or AIzaSy..."
             className="flex-1 px-4 py-2.5 rounded-xl bg-bg-surface border border-border-base text-text-primary text-sm focus:border-accent-gold focus:outline-none"
           />
           <button

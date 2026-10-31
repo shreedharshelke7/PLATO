@@ -2,12 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
   checkAIAccessLimits,
-  getGeminiConfig,
-  createGeminiClient,
-  generateContentWithFallback,
   cleanJsonOutput,
   errorResponse,
 } from "@/lib/gemini/server";
+import { getAIConfig, generateTextCompletion } from "@/lib/ai/provider";
 import { searchLocalFoods } from "@/data/foods";
 
 export const maxDuration = 30;
@@ -46,12 +44,11 @@ export async function POST(req: NextRequest) {
     return errorResponse("Text is required to parse a meal", "MISSING_TEXT", 400);
   }
 
-  const { apiKey, model } = getGeminiConfig(req);
+  const aiConfig = getAIConfig(req, "text");
 
-  // If Gemini key is available, use Gemini text for intelligent NLP portion extraction
-  if (apiKey) {
+  // If AI key is available, use Groq or Gemini text for intelligent NLP portion extraction
+  if (aiConfig && aiConfig.apiKey) {
     try {
-      const ai = createGeminiClient(apiKey);
       const prompt = `You are Demeter's nutrition parser. Convert this description into a structured meal item list:
 "${text}"
 
@@ -74,11 +71,11 @@ Return ONLY raw JSON conforming to this schema without markdown fences:
   ]
 }`;
 
-      const response = await generateContentWithFallback(ai, model, {
-        contents: prompt,
+      const responseText = await generateTextCompletion({
+        config: aiConfig,
+        prompt,
       });
 
-      const responseText = response.text || "";
       const cleaned = cleanJsonOutput(responseText);
       const parsed = JSON.parse(cleaned);
       const validated = ParseMealSchema.parse(parsed);

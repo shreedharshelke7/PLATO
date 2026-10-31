@@ -2,12 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
   checkAIAccessLimits,
-  getGeminiConfig,
-  createGeminiClient,
-  generateContentWithFallback,
   cleanJsonOutput,
   errorResponse,
 } from "@/lib/gemini/server";
+import { getAIConfig, generateTextCompletion } from "@/lib/ai/provider";
 
 export const maxDuration = 30;
 
@@ -32,12 +30,10 @@ export async function POST(req: NextRequest) {
   const past7Days = body.past7DaysSummary || {};
   const profile = body.profile || {};
 
-  const { apiKey, model } = getGeminiConfig(req);
+  const aiConfig = getAIConfig(req, "text");
 
-  if (apiKey) {
+  if (aiConfig && aiConfig.apiKey) {
     try {
-      const ai = createGeminiClient(apiKey);
-
       const prompt = `You are Athena, the Greek Goddess of Strategic Wisdom and AI Nutrition Coach in Ambrosia.
 The user is asking: "${question || "What strategic improvements can I make to my diet based on my recent progress?"}"
 
@@ -68,11 +64,11 @@ Output strictly valid JSON:
   "focusForTomorrow": "One single priority for tomorrow"
 }`;
 
-      const response = await generateContentWithFallback(ai, model, {
-        contents: prompt,
+      const text = await generateTextCompletion({
+        config: aiConfig,
+        prompt,
       });
 
-      const text = response.text || "";
       const cleaned = cleanJsonOutput(text);
       const parsed = JSON.parse(cleaned);
       const validated = CoachResponseSchema.parse(parsed);

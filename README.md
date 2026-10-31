@@ -56,12 +56,13 @@ Ambrosia gracefully degrades when API keys or credentials are not provided. The 
 
 | Variable | Type | Required? | Example Value | Description |
 |---|---|---|---|---|
-| `GEMINI_API_KEY` | String | Optional | `AIzaSyD...` | Server-side Google Gemini Flash API key for photo meal scanning, Divine Swap generation, and Athena AI coaching. |
-| `GEMINI_MODEL` | String | Optional | `gemini-1.5-flash` | The Gemini model identifier. Defaults to `gemini-1.5-flash` (or `gemini-2.0-flash`). |
+| `GROQ_API_KEY` | String | Optional | `gsk_...` | Free ultra-fast Groq LPU API key for Llama 3.2 11B Vision meal scanning and Llama 3.3 70B Athena coaching. |
+| `GEMINI_API_KEY` | String | Optional | `AIzaSyD...` | Optional Google Gemini Flash API key for vision and text fallbacks. |
+| `GEMINI_MODEL` | String | Optional | `gemini-1.5-flash` | The Gemini model identifier. Defaults to `gemini-1.5-flash`. |
 | `NEXT_PUBLIC_SUPABASE_URL` | String | Optional | `https://xyz.supabase.co` | Your Supabase project URL. If omitted, app runs in standalone guest mode. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | String | Optional | `eyJhbGciOi...` | Supabase public anonymous API key for browser client authentication & sync. |
 
-> **Security Mandate**: Never prefix `GEMINI_API_KEY` with `NEXT_PUBLIC_`. Gemini keys are strictly invoked inside server route handlers (`/api/scan`, `/api/swap`, `/api/coach`, `/api/plan`, `/api/parse-meal`). Users may also supply their own key in **Settings**, stored strictly in local IndexedDB.
+> **Security Mandate**: Never prefix `GROQ_API_KEY` or `GEMINI_API_KEY` with `NEXT_PUBLIC_`. Keys are strictly invoked inside server route handlers (`/api/scan`, `/api/swap`, `/api/coach`, `/api/plan`, `/api/parse-meal`). Users may also supply their own key in **Settings**, stored strictly in local IndexedDB.
 
 ---
 

@@ -2,12 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
   checkAIAccessLimits,
-  getGeminiConfig,
-  createGeminiClient,
-  generateContentWithFallback,
   cleanJsonOutput,
   errorResponse,
 } from "@/lib/gemini/server";
+import { getAIConfig, generateVisionCompletion } from "@/lib/ai/provider";
 
 export const maxDuration = 30;
 
@@ -45,11 +43,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 2. Auth check
-  const { apiKey, model } = getGeminiConfig(req);
-  if (!apiKey) {
+  // 2. Resolve AI provider config (Groq or Gemini)
+  const aiConfig = getAIConfig(req, "vision");
+  if (!aiConfig || !aiConfig.apiKey) {
     return errorResponse(
-      "Gemini API key is not configured. Add your key in Settings or contact administrator.",
+      "AI is not configured. Add your Groq API key (free at console.groq.com) or Gemini key in Settings or environment variables.",
       "AI_NOT_CONFIGURED",
       503
     );
@@ -101,9 +99,7 @@ export async function POST(req: NextRequest) {
     return errorResponse("Image payload exceeds 4MB limit", "PAYLOAD_TOO_LARGE", 413);
   }
 
-  // 4. Prompt Gemini Vision
-  const ai = createGeminiClient(apiKey);
-
+  // 4. Prompt Vision AI
   const systemInstruction = `You are Demeter, the Olympian vision food analyst.
 Analyze the provided food photograph. You excel at recognizing Indian dishes (thali, roti, chapati, dal tadka, rajma, chole, paneer butter masala, poha, upma, idli, dosa, sambar, vada pav, biryani, street snacks) and global meals.
 Estimate portions using visual context (e.g. katori count, roti count, plate percentage, piece sizes).
@@ -136,44 +132,44 @@ CRITICAL RULES:
 3. Do not return markdown fences. Return ONLY the raw JSON string.`;
 
   try {
-    const response = await generateContentWithFallback(ai, model, {
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { text: systemInstruction },
-            {
-              inlineData: {
-                data: imageBase64,
-                mimeType,
-              },
-            },
-          ],
-        },
-      ],
+    const responseText = await generateVisionCompletion({
+      config: aiConfig,
+      prompt: systemInstruction,
+      imageBase64,
+      mimeType,
     });
 
-    const responseText = response.text || "";
     const cleanedJson = cleanJsonOutput(responseText);
     const parsed = JSON.parse(cleanedJson);
     const validated = ScanResponseSchema.parse(parsed);
 
     return NextResponse.json(validated);
   } catch (err: unknown) {
-    // If model is not found or API key fails
     const errorStr = String(err);
     if (errorStr.includes("not found") || errorStr.includes("model")) {
       return errorResponse(
-        `Gemini model "${model}" was not found or is unavailable for this key. Please check GEMINI_MODEL.`,
+        `AI vision model "${aiConfig.model}" was not found or is unavailable for this key.`,
         "MODEL_NOT_FOUND",
         503
       );
     }
-    if (errorStr.includes("API_KEY_INVALID") || errorStr.includes("403") || errorStr.includes("401")) {
+    if (
+      errorStr.includes("API_KEY_INVALID") ||
+      errorStr.includes("403") ||
+      errorStr.includes("401") ||
+      errorStr.includes("invalid_api_key")
+    ) {
       return errorResponse(
-        "Invalid Gemini API key provided. Please verify your key in Settings.",
+        `Invalid ${aiConfig.provider === "groq" ? "Groq" : "Gemini"} API key provided. Please verify your key in Settings.`,
         "INVALID_API_KEY",
         401
+      );
+    }
+    if (errorStr.includes("rate_limit_exceeded") || errorStr.includes("429")) {
+      return errorResponse(
+        "AI rate limit reached. Please wait a moment before trying again.",
+        "RATE_LIMIT_EXCEEDED",
+        429
       );
     }
 

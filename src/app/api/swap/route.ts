@@ -2,12 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
   checkAIAccessLimits,
-  getGeminiConfig,
-  createGeminiClient,
-  generateContentWithFallback,
   cleanJsonOutput,
   errorResponse,
 } from "@/lib/gemini/server";
+import { getAIConfig, generateTextCompletion } from "@/lib/ai/provider";
 
 export const maxDuration = 30;
 
@@ -206,13 +204,11 @@ export async function POST(req: NextRequest) {
     return errorResponse("Query food is required for Divine Swap", "MISSING_QUERY", 400);
   }
 
-  const { apiKey, model } = getGeminiConfig(req);
+  const aiConfig = getAIConfig(req, "text");
 
-  // If Gemini API is available, invoke Dionysus AI
-  if (apiKey) {
+  // If AI is configured (Groq or Gemini), invoke Dionysus AI
+  if (aiConfig && aiConfig.apiKey) {
     try {
-      const ai = createGeminiClient(apiKey);
-
       const prompt = `You are Dionysus, the master of feasts and Divine Swaps in Ambrosia.
 The user is craving this junk/fast food: "${query}".
 User Profile:
@@ -252,11 +248,11 @@ Return ONLY raw JSON conforming to this schema without markdown fences:
   ]
 }`;
 
-      const response = await generateContentWithFallback(ai, model, {
-        contents: prompt,
+      const text = await generateTextCompletion({
+        config: aiConfig,
+        prompt,
       });
 
-      const text = response.text || "";
       const cleaned = cleanJsonOutput(text);
       const parsed = JSON.parse(cleaned);
       const validated = SwapResponseSchema.parse(parsed);
