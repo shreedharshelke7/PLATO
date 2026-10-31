@@ -4,20 +4,11 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { z } from "zod";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client";
+import { updatePasswordSchema, calculatePasswordStrength } from "@/lib/auth/schemas";
+import { mapSupabaseAuthError } from "@/lib/auth/errors";
 import { ZeusIcon } from "@/components/gods/ZeusIcon";
 import { Lock, Eye, EyeOff, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
-
-const updateSchema = z
-  .object({
-    password: z.string().min(8, "Password must be at least 8 characters"),
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords do not match",
-    path: ["confirmPassword"],
-  });
 
 export default function UpdatePasswordPage() {
   const router = useRouter();
@@ -30,11 +21,15 @@ export default function UpdatePasswordPage() {
 
   const supabaseConfigured = isSupabaseConfigured();
 
+  const { score: strengthScore, label: strengthLabel, colorClass: strengthColor } =
+    calculatePasswordStrength(password);
+
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
     setErrorMessage(null);
 
-    const result = updateSchema.safeParse({ password, confirmPassword });
+    const result = updatePasswordSchema.safeParse({ password, confirmPassword });
     if (!result.success) {
       setErrorMessage(result.error.issues[0]?.message || "Invalid password inputs");
       return;
@@ -55,16 +50,16 @@ export default function UpdatePasswordPage() {
       });
 
       if (error) {
-        setErrorMessage(error.message);
+        setErrorMessage(mapSupabaseAuthError(error).message);
         return;
       }
 
       setIsSuccess(true);
       setTimeout(() => {
         router.replace("/dashboard");
-      }, 2000);
+      }, 1500);
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "Password update failed.");
+      setErrorMessage(mapSupabaseAuthError(err instanceof Error ? err.message : String(err)).message);
     } finally {
       setIsLoading(false);
     }
@@ -105,7 +100,7 @@ export default function UpdatePasswordPage() {
               Password Restored
             </h3>
             <p className="text-xs text-text-muted leading-relaxed">
-              Your new password has been verified. Redirecting you to your throne room...
+              Your new password has been verified. Redirecting you to your dashboard...
             </p>
           </div>
         ) : (
@@ -119,7 +114,7 @@ export default function UpdatePasswordPage() {
 
             <div className="space-y-1">
               <label className="block text-xs font-semibold text-text-muted">
-                New Password (min 8 chars)
+                New Password
               </label>
               <div className="relative">
                 <Lock className="w-4 h-4 text-text-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -127,8 +122,9 @@ export default function UpdatePasswordPage() {
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder="Min. 8 characters"
                   className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-surface-glass border border-border focus:border-gold text-text text-sm transition-colors"
+                  autoComplete="new-password"
                   required
                 />
                 <button
@@ -140,6 +136,25 @@ export default function UpdatePasswordPage() {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+
+              {password.length > 0 && (
+                <div className="space-y-1 pt-1">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="text-text-muted">Strength:</span>
+                    <span className="font-semibold text-gold-light">{strengthLabel}</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-stone-800 rounded-full overflow-hidden flex gap-0.5">
+                    {[1, 2, 3, 4].map((step) => (
+                      <div
+                        key={step}
+                        className={`flex-1 h-full transition-all duration-300 ${
+                          strengthScore >= step ? strengthColor : "bg-transparent"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="space-y-1">
@@ -152,8 +167,9 @@ export default function UpdatePasswordPage() {
                   type={showPassword ? "text" : "password"}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder="Repeat new password"
                   className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-surface-glass border border-border focus:border-gold text-text text-sm transition-colors"
+                  autoComplete="new-password"
                   required
                 />
               </div>

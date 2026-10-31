@@ -51,6 +51,14 @@ interface ApiParsedItem {
 
 type ScanTab = "photo" | "barcode" | "search";
 
+function getMealTypeFromTime(): MealType {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 11) return "breakfast";
+  if (hour >= 11 && hour < 16) return "lunch";
+  if (hour >= 16 && hour < 19) return "snack";
+  return "dinner";
+}
+
 function MealScannerContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -99,13 +107,6 @@ function MealScannerContent() {
   const [freeTextMeal, setFreeTextMeal] = useState("");
   const searchResults = searchLocalFoods(searchQuery, 15);
 
-  function getMealTypeFromTime(): MealType {
-    const hour = new Date().getHours();
-    if (hour >= 5 && hour < 11) return "breakfast";
-    if (hour >= 11 && hour < 16) return "lunch";
-    if (hour >= 16 && hour < 19) return "snack";
-    return "dinner";
-  }
 
   // --- PHOTO SCANNING ---
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

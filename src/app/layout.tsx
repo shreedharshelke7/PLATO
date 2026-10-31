@@ -40,6 +40,7 @@ export const viewport: Viewport = {
 };
 
 import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
+import { AuthProvider } from "@/lib/supabase/AuthProvider";
 
 export default function RootLayout({
   children,
@@ -87,8 +88,10 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen bg-bg-base text-text-primary antialiased selection:bg-accent-gold/20 selection:text-accent-gold">
-        <ServiceWorkerRegister />
-        {children}
+        <AuthProvider>
+          <ServiceWorkerRegister />
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

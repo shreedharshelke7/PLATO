@@ -4,9 +4,10 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { z } from "zod";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { validateRedirectPath } from "@/lib/utils/redirect";
+import { loginSchema } from "@/lib/auth/schemas";
+import { mapSupabaseAuthError } from "@/lib/auth/errors";
 import { ZeusIcon } from "@/components/gods/ZeusIcon";
 import {
   LogIn,
@@ -17,17 +18,15 @@ import {
   AlertCircle,
   Compass,
   Loader2,
+  Send,
+  CheckCircle2,
 } from "lucide-react";
-
-const loginSchema = z.object({
-  email: z.string().email("Please provide a valid email address"),
-  password: z.string().min(1, "Password is required"),
-});
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextParam = searchParams.get("next");
+  const urlError = searchParams.get("error");
   const targetPath = validateRedirectPath(nextParam, "/dashboard");
 
   const [email, setEmail] = useState("");
@@ -35,10 +34,16 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(() =>
+    urlError ? mapSupabaseAuthError(urlError).message : null
+  );
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [showResendBtn, setShowResendBtn] = useState(false);
+  const [resendStatus, setResendStatus] = useState<string | null>(null);
+  const [isResending, setIsResending] = useState(false);
 
   const supabaseConfigured = isSupabaseConfigured();
+  const enableGoogle = process.env.NEXT_PUBLIC_ENABLE_GOOGLE === "true";
 
   const handleGuestEntry = () => {
     try {
@@ -51,8 +56,12 @@ function LoginForm() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
+
     setErrorMessage(null);
     setFieldErrors({});
+    setShowResendBtn(false);
+    setResendStatus(null);
 
     const result = loginSchema.safeParse({ email, password });
     if (!result.success) {
@@ -65,7 +74,7 @@ function LoginForm() {
     }
 
     if (!supabaseConfigured) {
-      setErrorMessage("Authentication is not configured on this deployment. Please continue as guest.");
+      setErrorMessage("Authentication is not configured on this deployment. Please add Supabase environment variables or continue as guest.");
       return;
     }
 
@@ -80,14 +89,10 @@ function LoginForm() {
       });
 
       if (error) {
-        if (error.message.includes("Invalid login credentials")) {
-          setErrorMessage("Invalid email or password. Please verify your credentials.");
-        } else if (error.message.includes("Email not confirmed")) {
-          setErrorMessage("Please confirm your email address before signing in. Check your inbox.");
-        } else if (error.message.toLowerCase().includes("rate limit")) {
-          setErrorMessage("Too many login attempts. Please wait a moment and try again.");
-        } else {
-          setErrorMessage(error.message);
+        const mapped = mapSupabaseAuthError(error);
+        setErrorMessage(mapped.message);
+        if (mapped.isEmailNotConfirmed) {
+          setShowResendBtn(true);
         }
         return;
       }
@@ -98,9 +103,39 @@ function LoginForm() {
         router.replace(targetPath);
       }
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "An unexpected error occurred.");
+      const mapped = mapSupabaseAuthError(err instanceof Error ? err.message : String(err));
+      setErrorMessage(mapped.message);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    if (!email.trim() || isResending) return;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+
+    setIsResending(true);
+    setResendStatus(null);
+    try {
+      const origin = window.location.origin;
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email: email.trim(),
+        options: {
+          emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(targetPath)}`,
+        },
+      });
+
+      if (error) {
+        setResendStatus(`Failed to resend: ${error.message}`);
+      } else {
+        setResendStatus("Confirmation email dispatched! Please check your inbox.");
+      }
+    } catch {
+      setResendStatus("Failed to resend. Please try again later.");
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -123,11 +158,11 @@ function LoginForm() {
         },
       });
       if (error) {
-        setErrorMessage(error.message);
+        setErrorMessage(mapSupabaseAuthError(error).message);
         setIsGoogleLoading(false);
       }
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "Google OAuth initiation failed.");
+      setErrorMessage(mapSupabaseAuthError(err instanceof Error ? err.message : String(err)).message);
       setIsGoogleLoading(false);
     }
   };
@@ -170,15 +205,15 @@ function LoginForm() {
           </p>
         </div>
 
-        {/* Not Configured Banner (Graceful Degradation) */}
+        {/* Not Configured Banner (Developer notice & graceful degradation) */}
         {!supabaseConfigured && (
           <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 space-y-2">
             <div className="flex items-center gap-2 font-semibold">
               <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
-              <span>Accounts are not configured on this deployment</span>
+              <span>Supabase is not configured on this deployment</span>
             </div>
             <p className="text-[11px] text-text-muted leading-relaxed">
-              You can still use all nutrition, scanner, and Divine Swap features in guest mode with local IndexedDB storage.
+              Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to your environment variables. You can still use all features in guest mode with local IndexedDB storage.
             </p>
             <button
               type="button"
@@ -192,9 +227,32 @@ function LoginForm() {
 
         {/* Global Error Banner */}
         {errorMessage && (
-          <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>{errorMessage}</span>
+          <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs space-y-2">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{errorMessage}</span>
+            </div>
+            {showResendBtn && (
+              <button
+                type="button"
+                onClick={handleResendConfirmation}
+                disabled={isResending}
+                className="mt-1 px-3 py-1.5 rounded-lg bg-gold/20 border border-gold/40 text-gold text-xs font-semibold hover:bg-gold/30 flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+              >
+                {isResending ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Send className="w-3.5 h-3.5" />
+                )}
+                <span>Resend Confirmation Email</span>
+              </button>
+            )}
+            {resendStatus && (
+              <div className="flex items-center gap-1.5 text-[11px] text-gold-light mt-1">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>{resendStatus}</span>
+              </div>
+            )}
           </div>
         )}
 
@@ -278,45 +336,48 @@ function LoginForm() {
           </button>
         </form>
 
-        {/* Divider */}
-        <div className="relative flex items-center justify-center">
-          <div className="w-full border-t border-border" />
-          <span className="absolute px-3 bg-surface text-[11px] text-text-muted font-mono uppercase">
-            or
-          </span>
-        </div>
+        {/* Optional Google OAuth Button (hidden if not enabled) */}
+        {enableGoogle && (
+          <>
+            <div className="relative flex items-center justify-center">
+              <div className="w-full border-t border-border" />
+              <span className="absolute px-3 bg-surface text-[11px] text-text-muted font-mono uppercase">
+                or
+              </span>
+            </div>
 
-        {/* Google OAuth Button */}
-        <button
-          type="button"
-          onClick={handleGoogleLogin}
-          disabled={isGoogleLoading || !supabaseConfigured}
-          className="w-full py-3 rounded-xl border border-border hover:border-gold/50 bg-surface-glass text-xs font-semibold text-text flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
-        >
-          {isGoogleLoading ? (
-            <Loader2 className="w-4 h-4 animate-spin text-gold" />
-          ) : (
-            <svg className="w-4 h-4" viewBox="0 0 24 24">
-              <path
-                fill="#4285F4"
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-              />
-              <path
-                fill="#EA4335"
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-              />
-            </svg>
-          )}
-          <span>Continue with Google</span>
-        </button>
+            <button
+              type="button"
+              onClick={handleGoogleLogin}
+              disabled={isGoogleLoading || !supabaseConfigured}
+              className="w-full py-3 rounded-xl border border-border hover:border-gold/50 bg-surface-glass text-xs font-semibold text-text flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+            >
+              {isGoogleLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin text-gold" />
+              ) : (
+                <svg className="w-4 h-4" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                  />
+                </svg>
+              )}
+              <span>Continue with Google</span>
+            </button>
+          </>
+        )}
 
         {/* Footer Navigation: Sign up & Guest mode */}
         <div className="pt-2 flex flex-col items-center gap-2 text-xs text-center border-t border-border">
