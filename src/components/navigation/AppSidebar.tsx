@@ -22,6 +22,7 @@ import {
   ChefHat,
   TrendingUp,
   Settings,
+  Target,
 } from "lucide-react";
 
 export function AppSidebar() {
@@ -34,6 +35,13 @@ export function AppSidebar() {
       sub: "Zeus Overview",
       icon: LayoutDashboard,
       godIcon: ZeusIcon,
+    },
+    {
+      href: "/goals",
+      label: "My Goals",
+      sub: "Ascent Targets",
+      icon: Target,
+      godIcon: ApolloIcon,
     },
     {
       href: "/scan",

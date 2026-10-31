@@ -12,7 +12,7 @@ import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "./client";
 import { setActiveUserId } from "../db/db";
-import { triggerSync } from "../sync/syncEngine";
+import { pushImmediate } from "../sync/syncEngine";
 
 export interface UserProfile {
   id?: string;
@@ -138,11 +138,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const supabase = getSupabaseBrowserClient();
 
       // 1. Run final sync if online and signed in
+      let finalPushFailed = false;
       if (typeof navigator !== "undefined" && navigator.onLine && user) {
         try {
-          await triggerSync();
-        } catch {
-          // ignore
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Final sync timeout")), 4000)
+          );
+          await Promise.race([pushImmediate(), timeoutPromise]);
+        } catch (err) {
+          console.warn("Final cloud push failed before sign-out:", err);
+          finalPushFailed = true;
+          if (typeof window !== "undefined") {
+            window.alert(
+              "Cloud sync could not be verified before signing out. To prevent any data loss, your local records have been preserved on this device."
+            );
+          }
         }
       }
 
@@ -169,8 +179,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(null);
       setActiveUserId(null);
 
-      // 5. Delete local database unless "Keep data on this device" was checked (default: off)
-      if (!options?.keepLocalData && previousUserId) {
+      // 5. Delete local database ONLY IF "Keep data on this device" was false AND final sync did NOT fail
+      if (!options?.keepLocalData && !finalPushFailed && previousUserId) {
         try {
           const { deleteDatabase } = await import("../db/db");
           await deleteDatabase(previousUserId);

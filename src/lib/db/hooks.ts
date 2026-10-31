@@ -5,6 +5,8 @@ import { useState, useEffect } from "react";
 import {
   db,
   DBProfile,
+  DBGoal,
+  GoalType,
   DBMeal,
   DBMealItem,
   DBWaterLog,
@@ -16,7 +18,8 @@ import {
   isIndexedDBAvailable,
 } from "./db";
 import { UserProfileInput, calculateTargets } from "../nutrition/targets";
-import { notifyDataChanged } from "../sync/syncEngine";
+import { notifyDataChanged, pushImmediate } from "../sync/syncEngine";
+import { normalizeTargets, GoalTargets } from "../nutrition/defaults";
 
 // Hook to check IndexedDB health / private mode
 export function useDBStatus() {
@@ -55,6 +58,7 @@ export function useProfile() {
     };
     await db.profile.put(fullProfile);
     notifyDataChanged();
+    pushImmediate().catch(() => {});
     return fullProfile;
   };
 
@@ -71,6 +75,7 @@ export function useProfile() {
     };
     await db.profile.put(updated);
     notifyDataChanged();
+    pushImmediate().catch(() => {});
   };
 
   return {
@@ -79,6 +84,219 @@ export function useProfile() {
     saveProfile,
     updateProfileTargets,
     hasProfile: Boolean(profile),
+  };
+}
+
+// Hook for Multiple Health Goals
+export function useGoals() {
+  const rawGoals = useLiveQuery(
+    () => db.goals.filter((g) => !g.deleted).toArray(),
+    [],
+    undefined
+  );
+
+  const isLoading = rawGoals === undefined;
+  const goals = (rawGoals ?? []).sort((a, b) => {
+    if (a.isActive && !b.isActive) return -1;
+    if (!a.isActive && b.isActive) return 1;
+    return (b.createdAt ?? 0) - (a.createdAt ?? 0);
+  });
+
+  const activeGoal = goals.find((g) => g.isActive && !g.archived) ?? null;
+  const targets = normalizeTargets(activeGoal?.targets);
+  const hasActiveGoal = Boolean(activeGoal);
+
+  const createGoal = async (data: {
+    name: string;
+    type: GoalType;
+    targets: GoalTargets;
+    startWeightKg?: number;
+    targetWeightKg?: number;
+    targetDate?: string;
+    pace?: "gentle" | "standard";
+    notes?: string;
+    setActive?: boolean;
+  }) => {
+    const now = Date.now();
+    const id = `goal_${now}_${Math.random().toString(36).slice(2, 7)}`;
+    const isFirstGoal = goals.length === 0;
+    const shouldBeActive = data.setActive ?? isFirstGoal;
+
+    if (shouldBeActive) {
+      await db.goals.toCollection().modify((g) => {
+        if (g.isActive) {
+          g.isActive = false;
+          g.updatedAt = now;
+        }
+      });
+    }
+
+    const newGoal: DBGoal = {
+      id,
+      name: data.name.trim(),
+      type: data.type,
+      isActive: shouldBeActive,
+      targets: data.targets,
+      startWeightKg: data.startWeightKg,
+      targetWeightKg: data.targetWeightKg,
+      targetDate: data.targetDate,
+      pace: data.pace,
+      notes: data.notes,
+      archived: false,
+      createdAt: now,
+      updatedAt: now,
+      deleted: false,
+    };
+
+    await db.goals.put(newGoal);
+
+    // Award XP event for Goal Created (+10 XP)
+    await db.xpEvents.put({
+      id: `xp_goal_${id}`,
+      type: "goal_created",
+      xp: 10,
+      description: `Health goal forged: ${newGoal.name}`,
+      timestamp: now,
+      updatedAt: now,
+      deleted: false,
+    });
+
+    notifyDataChanged();
+    pushImmediate().catch(() => {});
+    return newGoal;
+  };
+
+  const setActiveGoal = async (goalId: string) => {
+    const now = Date.now();
+    await db.transaction("rw", db.goals, async () => {
+      const all = await db.goals.toArray();
+      for (const g of all) {
+        if (g.id === goalId) {
+          await db.goals.update(g.id, {
+            isActive: true,
+            archived: false,
+            updatedAt: now,
+          });
+        } else if (g.isActive) {
+          await db.goals.update(g.id, {
+            isActive: false,
+            updatedAt: now,
+          });
+        }
+      }
+    });
+    notifyDataChanged();
+    pushImmediate().catch(() => {});
+  };
+
+  const updateGoal = async (
+    goalId: string,
+    updates: Partial<Omit<DBGoal, "id" | "createdAt">>
+  ) => {
+    const now = Date.now();
+    await db.goals.update(goalId, {
+      ...updates,
+      updatedAt: now,
+    });
+    notifyDataChanged();
+    pushImmediate().catch(() => {});
+  };
+
+  const archiveGoal = async (goalId: string) => {
+    const now = Date.now();
+    await db.transaction("rw", db.goals, async () => {
+      const target = await db.goals.get(goalId);
+      if (!target) return;
+
+      await db.goals.update(goalId, {
+        archived: true,
+        isActive: false,
+        updatedAt: now,
+      });
+
+      if (target.isActive) {
+        const remaining = await db.goals
+          .filter((g) => !g.deleted && !g.archived && g.id !== goalId)
+          .reverse()
+          .sortBy("createdAt");
+        if (remaining.length > 0) {
+          await db.goals.update(remaining[0].id, {
+            isActive: true,
+            updatedAt: now,
+          });
+        }
+      }
+    });
+    notifyDataChanged();
+    pushImmediate().catch(() => {});
+  };
+
+  const deleteGoal = async (goalId: string) => {
+    const now = Date.now();
+    let wasActive = false;
+    await db.transaction("rw", db.goals, async () => {
+      const target = await db.goals.get(goalId);
+      if (!target) return;
+      wasActive = target.isActive;
+
+      await db.goals.update(goalId, {
+        deleted: true,
+        isActive: false,
+        updatedAt: now,
+      });
+
+      if (wasActive) {
+        const remaining = await db.goals
+          .filter((g) => !g.deleted && !g.archived && g.id !== goalId)
+          .reverse()
+          .sortBy("createdAt");
+        if (remaining.length > 0) {
+          await db.goals.update(remaining[0].id, {
+            isActive: true,
+            updatedAt: now,
+          });
+        }
+      }
+    });
+
+    notifyDataChanged();
+    pushImmediate().catch(() => {});
+
+    return async function undo() {
+      await db.transaction("rw", db.goals, async () => {
+        await db.goals.update(goalId, {
+          deleted: false,
+          isActive: wasActive,
+          updatedAt: Date.now(),
+        });
+        if (wasActive) {
+          const others = await db.goals
+            .filter((g) => g.id !== goalId && g.isActive)
+            .toArray();
+          for (const o of others) {
+            await db.goals.update(o.id, {
+              isActive: false,
+              updatedAt: Date.now(),
+            });
+          }
+        }
+      });
+      notifyDataChanged();
+      pushImmediate().catch(() => {});
+    };
+  };
+
+  return {
+    goals,
+    activeGoal,
+    targets,
+    hasActiveGoal,
+    isLoading,
+    createGoal,
+    setActiveGoal,
+    updateGoal,
+    archiveGoal,
+    deleteGoal,
   };
 }
 

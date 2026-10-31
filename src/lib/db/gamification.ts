@@ -92,6 +92,7 @@ export function evaluateAchievements(params: {
   totalWaterLoggedMl: number;
   breakfastStreak: number;
   totalSwapsLogged: number;
+  goalsCount?: number;
 }): Achievement[] {
   return [
     {
@@ -138,6 +139,15 @@ export function evaluateAchievements(params: {
       icon: "DionysusIcon",
       isUnlocked: params.totalSwapsLogged >= 3,
       progressText: `${Math.min(3, params.totalSwapsLogged)}/3 Swaps`,
+    },
+    {
+      id: "goal_setter",
+      name: "Goal Setter",
+      god: "Athena",
+      description: "Forge your first personal health goal for godlike direction.",
+      icon: "AthenaIcon",
+      isUnlocked: (params.goalsCount ?? 0) >= 1,
+      progressText: `${Math.min(1, params.goalsCount ?? 0)}/1 Goal`,
     },
   ];
 }

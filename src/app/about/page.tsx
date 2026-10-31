@@ -152,7 +152,7 @@ export default function AboutPage() {
         {/* Next Step CTA */}
         <div className="pt-4 text-center">
           <Link
-            href="/onboarding"
+            href="/goals/new"
             className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl font-bold bg-accent-gold hover:bg-accent-gold-hover text-stone-950 transition-all shadow-md active:scale-95 text-sm"
           >
             Calculate Your Olympian Goals <ArrowRight className="w-4 h-4" />

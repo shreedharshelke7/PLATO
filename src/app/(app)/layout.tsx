@@ -1,10 +1,9 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useProfile } from "@/lib/db/hooks";
+import { useAuth } from "@/lib/supabase/hooks";
 import { migrateLegacyDatabase } from "@/lib/db/db";
-import { triggerSync } from "@/lib/sync/syncEngine";
+import { triggerSync, waitForInitialSync, isInitialSyncCompleted } from "@/lib/sync/syncEngine";
 import { AppSidebar } from "@/components/navigation/AppSidebar";
 import { AppHeader } from "@/components/navigation/AppHeader";
 import { MobileTabBar } from "@/components/navigation/MobileTabBar";
@@ -12,48 +11,55 @@ import { ImportGuestDataDialog } from "@/components/auth/ImportGuestDataDialog";
 import { ZeusIcon } from "@/components/gods";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
-  const { profile, isLoading } = useProfile();
-  const [isTimedOut, setIsTimedOut] = useState(false);
+  const { user } = useAuth();
+  const [isInitialSyncing, setIsInitialSyncing] = useState(false);
 
   useEffect(() => {
-    // Safety fallback: never allow loader to block for more than 2.5s
-    const timer = setTimeout(() => {
-      setIsTimedOut(true);
-    }, 2500);
+    let isCancelled = false;
 
-    // Check legacy database migration and initiate initial sync
+    // Check legacy database migration
     migrateLegacyDatabase().catch(() => {});
-    triggerSync().catch(() => {});
 
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    // If done loading (or timed out) and no profile exists, guide to onboarding
-    if ((!isLoading || isTimedOut) && !profile) {
-      router.replace("/onboarding");
+    // If logged in and initial sync not yet finished, wait for first cloud pull (max 6s timeout)
+    if (user && !isInitialSyncCompleted()) {
+      setIsInitialSyncing(true);
+      waitForInitialSync(6000)
+        .catch(() => {})
+        .finally(() => {
+          if (!isCancelled) {
+            setIsInitialSyncing(false);
+          }
+        });
+    } else {
+      triggerSync().catch(() => {});
     }
-  }, [isLoading, isTimedOut, profile, router]);
 
-  const showLoadingOverlay = isLoading && !isTimedOut && !profile;
+    return () => {
+      isCancelled = true;
+    };
+  }, [user]);
 
   return (
     <div className="min-h-screen bg-bg-base flex flex-row text-text-primary relative">
-      {/* Non-blocking loading overlay while initial profile query resolves */}
-      {showLoadingOverlay && (
-        <div className="fixed inset-0 z-50 bg-bg-base flex flex-col items-center justify-center p-4">
-          <div className="w-12 h-12 rounded-full bg-accent-gold/20 flex items-center justify-center text-accent-gold animate-pulse mb-3">
-            <ZeusIcon size={28} />
+      {/* Race-free initial cloud sync loading overlay */}
+      {isInitialSyncing && (
+        <div className="fixed inset-0 z-50 bg-bg-base/90 backdrop-blur-md flex flex-col items-center justify-center p-4">
+          <div className="w-14 h-14 rounded-full bg-accent-gold/20 border border-accent-gold/40 flex items-center justify-center text-accent-gold animate-pulse mb-3">
+            <ZeusIcon size={32} />
           </div>
-          <p className="font-serif text-sm text-text-secondary tracking-widest uppercase">
-            Summoning Mount Olympus...
+          <p className="font-serif text-sm text-text-primary tracking-widest uppercase font-semibold">
+            Synchronizing with Mount Olympus...
+          </p>
+          <p className="text-xs text-text-muted mt-1">
+            Restoring your divine records and goals
           </p>
         </div>
       )}
 
       {/* Desktop Sidebar */}
-      <AppSidebar />
+      <React.Suspense fallback={<aside className="hidden md:flex flex-col w-64 border-r border-border-base bg-surface-elevated/40" />}>
+        <AppSidebar />
+      </React.Suspense>
 
       {/* Main Container */}
       <div className="flex-1 flex flex-col min-w-0">
@@ -64,7 +70,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </React.Suspense>
         </main>
         {/* Mobile Tab Bar */}
-        <MobileTabBar />
+        <React.Suspense fallback={null}>
+          <MobileTabBar />
+        </React.Suspense>
       </div>
 
       {/* Guest-to-Account Merge Dialog */}

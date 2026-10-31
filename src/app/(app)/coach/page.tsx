@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-import { useProfile, useXP, useSettings } from "@/lib/db/hooks";
+import { useProfile, useXP, useSettings, useGoals } from "@/lib/db/hooks";
 import { AthenaIcon } from "@/components/gods";
 import {
   Send,
@@ -21,6 +21,7 @@ interface CoachMessage {
 
 export default function AICoachPage() {
   const { profile } = useProfile();
+  const { activeGoal, targets } = useGoals();
   const { settings } = useSettings();
   const { streakDays, totalXP } = useXP();
   const counterRef = useRef(1);
@@ -75,11 +76,12 @@ export default function AICoachPage() {
         body: JSON.stringify({
           question: q,
           profile,
+          activeGoal,
           past7DaysSummary: {
             streakDays,
             totalXP,
-            avgCalories: profile?.targets?.calories || 2000,
-            avgProtein: profile?.targets?.proteinG || 130,
+            avgCalories: targets.calories,
+            avgProtein: targets.protein_g,
           },
         }),
       });

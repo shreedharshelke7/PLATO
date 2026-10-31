@@ -19,11 +19,11 @@ Ambrosia is architected as an **offline-first, cloud-synchronized** progressive 
                                   │ Direct Sub-millisecond Reads & Writes
                                   ▼
 ┌────────────────────────────────────────────────────────────────────────┐
-│                   LOCAL STORAGE LAYER (IndexedDB / Dexie v2)           │
+│                   LOCAL STORAGE LAYER (IndexedDB / Dexie v3)           │
 │                                                                        │
 │   • Database per user: `ambrosia-guest` or `ambrosia-${userId}`        │
-│   • Version 2 Schema: Soft-deletes (`deleted`) & `updatedAt` ms index  │
-│   • Automatic Legacy v1 -> v2 schema & data backfill                   │
+│   • Version 3 Schema: Multiple health goals (`goals` table) with sync  │
+│   • Automatic Legacy v1/v2 profile targets migration to active goal    │
 │   • Strictly local secrets: userApiKey is never sent to cloud          │
 └─────────────────────────────────┬──────────────────────────────────────┘
                                   │ Debounced (1.5s) / Online / Tab-focus
@@ -75,12 +75,13 @@ Ambrosia originated from an empirical **Community Engagement Program (CEP)** stu
 * **64% are actively willing to transform their diet**
 
 ### Key Capabilities
-1. **Divine Swap (Dionysus)**: Alchemical fast-food replacer that generates 3 high-protein, high-fiber alternatives under 10 minutes matching the taste profile of cravings (samosas, pizza, Maggi, street food).
-2. **Weekly Junk Budget**: Guilt-free treat budgeting without shaming.
-3. **Indian Food Intelligence**: 125+ regional Indian foods with portion sizing in katoris, rotis, and pieces.
-4. **Cinematic Landing Page ("The Academy of Ambrosia")**: 10 scroll-pinned scenes featuring 6 original Greek philosopher line-art SVGs (Plato, Aristotle, Socrates, Epicurus, Pythagoras, Heraclitus) with spoken Delphic maxims via the Web Speech API and gold dust particles.
-5. **Obsidian & Aurum Luxury System**: Dark luxury basalt with Aurum gold (`#D4AF37`), Ivory text, and five dynamic themes (`obsidian`, `marble`, `aegean`, `amethyst`, `auto`), with verified WCAG AA contrast.
-6. **Tiered AI Abuse Protection**:
+1. **Multiple Health Goals ("My Goals")**: Create, fine-tune, switch between, or archive multiple concurrent health goals (Fat Loss, Muscle Gain, Maintenance, Endurance, Longevity, General Wellness) directly inside the app. No forced onboarding wizard upon signup or login. Zero-goal state runs immediately on standard adult defaults (2,000 kcal, 60g protein, 25g fiber, 2,500ml water) with an interactive top-bar goal switcher.
+2. **Divine Swap (Dionysus)**: Alchemical fast-food replacer that generates 3 high-protein, high-fiber alternatives under 10 minutes matching the taste profile of cravings (samosas, pizza, Maggi, street food).
+3. **Weekly Junk Budget**: Guilt-free treat budgeting without shaming.
+4. **Indian Food Intelligence**: 125+ regional Indian foods with portion sizing in katoris, rotis, and pieces.
+5. **Cinematic Landing Page ("The Academy of Ambrosia")**: 10 scroll-pinned scenes featuring 6 original Greek philosopher line-art SVGs (Plato, Aristotle, Socrates, Epicurus, Pythagoras, Heraclitus) with spoken Delphic maxims via the Web Speech API and gold dust particles.
+6. **Obsidian & Aurum Luxury System**: Dark luxury basalt with Aurum gold (`#D4AF37`), Ivory text, and five dynamic themes (`obsidian`, `marble`, `aegean`, `amethyst`, `auto`), with verified WCAG AA contrast.
+7. **Tiered AI Abuse Protection**:
    * Guests: 5 scans/day per IP with friendly HTTP 429 sign-in prompt.
    * Signed-in accounts: High burst allowances.
    * Personal API keys (`x-user-key`): Unlimited usage bypassing server quotas.

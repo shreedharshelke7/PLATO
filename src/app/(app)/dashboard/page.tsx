@@ -3,9 +3,10 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
-import { useProfile, useMeals, useWater, useXP } from "@/lib/db/hooks";
+import { useProfile, useMeals, useWater, useXP, useGoals } from "@/lib/db/hooks";
 import { PowerRing } from "@/components/dashboard/PowerRing";
 import { MacroRing, FiberBar } from "@/components/dashboard/MacroRing";
+import { ActiveGoalChip } from "@/components/goals/ActiveGoalChip";
 import {
   ZeusIcon,
   DemeterIcon,
@@ -20,11 +21,19 @@ import {
   Flame,
   Camera,
   Trash2,
+  Target,
+  X,
 } from "lucide-react";
 
 export default function DashboardPage() {
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [todayStr, setTodayStr] = useState<string>("");
+  const [bannerDismissed, setBannerDismissed] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("ambrosia_dismiss_goal_banner") === "true";
+    }
+    return false;
+  });
 
   useEffect(() => {
     const today = format(new Date(), "yyyy-MM-dd");
@@ -33,18 +42,10 @@ export default function DashboardPage() {
   }, []);
 
   const { profile } = useProfile();
+  const { targets, hasActiveGoal } = useGoals();
   const { meals, totals, addMeal, deleteMeal } = useMeals(selectedDate);
   const { totalWaterMl } = useWater(selectedDate);
   const { breakfastStreak, totalSwapsLogged } = useXP();
-
-  const targets = profile?.targets ?? {
-    calories: 2100,
-    proteinG: 140,
-    carbsG: 240,
-    fatG: 63,
-    fiberG: 29,
-    waterMl: 2800,
-  };
 
   const remainingProtein = Math.max(0, targets.proteinG - totals.protein);
   const junkBudget = profile?.junkBudgetPerWeek ?? 3;
@@ -157,10 +158,13 @@ export default function DashboardPage() {
     <div className="space-y-8">
       {/* Top Banner: Greeting, Date Picker & Streak */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <span className="text-xs uppercase tracking-widest text-accent-gold font-semibold flex items-center gap-1.5">
-            <ZeusIcon size={16} /> Zeus Throne Room
-          </span>
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="text-xs uppercase tracking-widest text-accent-gold font-semibold flex items-center gap-1.5">
+              <ZeusIcon size={16} /> Zeus Throne Room
+            </span>
+            <ActiveGoalChip />
+          </div>
           <h1 className="font-serif text-2xl sm:text-3xl font-extrabold text-text-primary mt-0.5">
             Greetings, {profile?.name || "Warrior"}
           </h1>
@@ -188,6 +192,48 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Gentle Dismissible Goal Banner (only if no active goal) */}
+      {!hasActiveGoal && !bannerDismissed && (
+        <div className="p-4 rounded-2xl glass-panel-gold border border-accent-gold/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-accent-gold/20 flex items-center justify-center text-accent-gold shrink-0">
+              <Target className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="font-bold text-text-primary">
+                Set a health goal for personal targets
+              </p>
+              <p className="text-text-muted text-[11px]">
+                Currently utilizing general adult baseline targets (2000 kcal • 60g protein • 25g fiber • 2500ml water).
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+            <Link
+              href="/goals/new"
+              className="px-3 py-1.5 rounded-xl font-bold text-xs gold-gradient-btn shadow-sm"
+            >
+              Forge Goal
+            </Link>
+            <button
+              onClick={() => {
+                setBannerDismissed(true);
+                try {
+                  localStorage.setItem("ambrosia_dismiss_goal_banner", "true");
+                } catch {
+                  // ignore
+                }
+              }}
+              className="p-1 rounded-lg text-text-muted hover:text-text-primary cursor-pointer"
+              aria-label="Dismiss banner"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Primary Metabolic Hero Grid: Power Ring + Macro Rings */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Zeus Power Ring (Calorie Command) */}
@@ -195,6 +241,11 @@ export default function DashboardPage() {
           <div className="absolute top-4 left-4 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-accent-gold">
             <ZeusIcon size={14} /> Power Threshold
           </div>
+          {!hasActiveGoal && (
+            <span className="absolute top-4 right-4 px-2 py-0.5 rounded-full bg-accent-gold/20 border border-accent-gold/40 text-[10px] text-accent-gold font-bold">
+              Default targets
+            </span>
+          )}
           <div className="py-4">
             <PowerRing consumed={totals.calories} target={targets.calories} size={230} />
           </div>
@@ -223,9 +274,16 @@ export default function DashboardPage() {
         <div className="lg:col-span-7 p-6 rounded-3xl glass-panel flex flex-col justify-between space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-serif font-bold text-lg text-text-primary">
-                Macronutrient Pillars
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className="font-serif font-bold text-lg text-text-primary">
+                  Macronutrient Pillars
+                </h3>
+                {!hasActiveGoal && (
+                  <span className="px-2 py-0.5 rounded-full bg-surface-glass border border-border-base text-[10px] text-text-muted font-semibold">
+                    Default targets
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-text-secondary">
                 {remainingProtein > 0
                   ? `⚡ ${remainingProtein}g protein remaining to secure muscle preservation`

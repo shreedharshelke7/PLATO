@@ -136,51 +136,96 @@ export function notifyDataChanged() {
   }, 1500);
 }
 
+let activeSyncPromise: Promise<void> | null = null;
+let hasCompletedInitialSync = false;
+
+export function isInitialSyncCompleted(): boolean {
+  return hasCompletedInitialSync;
+}
+
+/**
+ * Waits for the first cloud sync pull to complete, with a safety timeout fallback.
+ */
+export async function waitForInitialSync(timeoutMs = 6000): Promise<void> {
+  if (hasCompletedInitialSync) return;
+  if (!activeSyncPromise) {
+    triggerSync().catch(() => {});
+  }
+  if (!activeSyncPromise) return;
+
+  const timer = new Promise<void>((resolve) => setTimeout(resolve, timeoutMs));
+  try {
+    await Promise.race([activeSyncPromise, timer]);
+  } catch {
+    // fallback gracefully
+  }
+}
+
+/**
+ * Pushes all pending local changes immediately to Supabase without waiting for debounce.
+ */
+export async function pushImmediate(): Promise<void> {
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+    debounceTimer = null;
+  }
+  return triggerSync({ force: true });
+}
+
 /**
  * Core bidirectional sync implementation
  */
 export async function triggerSync(options?: { force?: boolean }): Promise<void> {
   if (typeof window === "undefined") return;
 
-  if (!isSupabaseConfigured()) {
-    updateSyncStatus({ status: "offline", errorMessage: null });
-    return;
+  if (activeSyncPromise) {
+    return activeSyncPromise;
   }
 
-  if (navigator && !navigator.onLine) {
-    updateSyncStatus({ status: "offline", errorMessage: null });
-    return;
-  }
+  const syncRun = (async () => {
+    if (!isSupabaseConfigured()) {
+      updateSyncStatus({ status: "offline", errorMessage: null });
+      hasCompletedInitialSync = true;
+      return;
+    }
 
-  const supabase = getSupabaseBrowserClient();
-  if (!supabase) {
-    updateSyncStatus({ status: "offline" });
-    return;
-  }
+    if (navigator && !navigator.onLine) {
+      updateSyncStatus({ status: "offline", errorMessage: null });
+      hasCompletedInitialSync = true;
+      return;
+    }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) {
+      updateSyncStatus({ status: "offline" });
+      hasCompletedInitialSync = true;
+      return;
+    }
 
-  if (!user) {
-    // Unauthenticated guest: no cloud sync
-    updateSyncStatus({ status: "synced", errorMessage: null });
-    return;
-  }
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  // Ensure active user database matches logged-in user
-  setActiveUserId(user.id);
-  const userDb = getDatabase(user.id);
+    if (!user) {
+      // Unauthenticated guest: no cloud sync
+      updateSyncStatus({ status: "synced", errorMessage: null });
+      hasCompletedInitialSync = true;
+      return;
+    }
 
-  updateSyncStatus({ status: "syncing", errorMessage: null });
+    // Ensure active user database matches logged-in user
+    setActiveUserId(user.id);
+    const userDb = getDatabase(user.id);
 
-  try {
-    const lastSyncKey = `ambrosia_last_sync_${user.id}`;
-    const lastSyncAt = options?.force
-      ? 0
-      : Number(localStorage.getItem(lastSyncKey) || 0);
+    updateSyncStatus({ status: "syncing", errorMessage: null });
 
-    const syncStartTime = Date.now();
+    try {
+      const lastSyncKey = `ambrosia_last_sync_${user.id}`;
+      const lastSyncAt = options?.force
+        ? 0
+        : Number(localStorage.getItem(lastSyncKey) || 0);
+
+      const syncStartTime = Date.now();
 
     // ==========================================
     // 1. PUSH PHASE: Local changes -> Supabase
@@ -285,6 +330,7 @@ export async function triggerSync(options?: { force?: boolean }): Promise<void> 
       lastSyncAt: syncStartTime,
       errorMessage: null,
     });
+    hasCompletedInitialSync = true;
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : "Sync failed";
     console.error("Sync failed:", err);
@@ -292,7 +338,13 @@ export async function triggerSync(options?: { force?: boolean }): Promise<void> 
       status: "error",
       errorMessage: errorMsg,
     });
+  } finally {
+    activeSyncPromise = null;
   }
+})();
+
+  activeSyncPromise = syncRun;
+  return syncRun;
 }
 
 /**

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
-import { useWater, useProfile, useSettings } from "@/lib/db/hooks";
+import { useWater, useProfile, useSettings, useGoals } from "@/lib/db/hooks";
 import { calculateWaterSchedule, WaterSlot } from "@/lib/nutrition/targets";
 import { AmphoraWave } from "@/components/water/AmphoraWave";
 import { playWaterChime } from "@/lib/audio/chime";
@@ -25,6 +25,7 @@ export default function HydrationPage() {
   }, []);
 
   const { profile } = useProfile();
+  const { targets: goalTargets } = useGoals();
   const { updateSettings } = useSettings();
   const { waterLogs, totalWaterMl, addWater, undoWater } = useWater(todayStr);
 
@@ -37,7 +38,7 @@ export default function HydrationPage() {
   });
   const [inAppToast, setInAppToast] = useState<{ title: string; message: string } | null>(null);
 
-  const targetMl = profile?.targets?.waterMl ?? 2800;
+  const targetMl = goalTargets.water_ml ?? profile?.targets?.waterMl ?? 2500;
   const wakeTime = profile?.wakeTime ?? "07:00";
   const sleepTime = profile?.sleepTime ?? "23:00";
 

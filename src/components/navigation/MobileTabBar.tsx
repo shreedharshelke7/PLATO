@@ -14,6 +14,7 @@ import {
   Brain,
   ChefHat,
   Settings,
+  Target,
   X,
 } from "lucide-react";
 
@@ -22,6 +23,7 @@ export function MobileTabBar() {
   const [moreOpen, setMoreOpen] = useState(false);
 
   const moreLinks = [
+    { href: "/goals", label: "My Goals", icon: Target, desc: "Personal Health Ambitions" },
     { href: "/swap", label: "Divine Swap", icon: Sparkles, desc: "Dionysus Treat Upgrades" },
     { href: "/log", label: "Meal Diary", icon: CalendarDays, desc: "History & Edit Log" },
     { href: "/coach", label: "AI Coach", icon: Brain, desc: "Athena Insights & Q&A" },

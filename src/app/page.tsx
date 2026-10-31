@@ -50,7 +50,7 @@ const PHILOSOPHERS_DIRECTORY: Record<string, PhilosopherDetail> = {
       "Imagine the soul as a chariot. Reason holds the reins while appetite and spirit pull in their own directions. A well-fed life is neither starvation nor excess; it is the reins held steady. Come, learn what your plate is truly asking.",
     caption: "Inspired by Plato's chariot allegory (Phaedrus)",
     featureName: "Mifflin-St Jeor Goal Engine",
-    featureHref: "/onboarding",
+    featureHref: "/goals",
     featureDescription:
       "Our pure-function goal engine acts as the Charioteer, calculating certified BMR, TDEE, protein preservation floors, and fiber requirements based on your unique biometric baseline.",
     figureComponent: PlatoFigure,

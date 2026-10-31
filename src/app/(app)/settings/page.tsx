@@ -28,6 +28,7 @@ import {
   LogOut,
   LogIn,
   Shield,
+  Target,
 } from "lucide-react";
 
 export default function SettingsPage() {
@@ -175,7 +176,7 @@ export default function SettingsPage() {
       // ignore
     }
     alert("All records purged. Returning to Mortal Genesis.");
-    router.replace("/onboarding");
+    router.replace("/dashboard");
   };
 
   return (
@@ -431,18 +432,32 @@ export default function SettingsPage() {
         </div>
       </section>
 
-      {/* 4. PROFILE & TARGETS EDIT */}
+      {/* 4. PROFILE & BIOMETRICS */}
       <section className="p-6 rounded-3xl glass-panel space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="font-serif font-bold text-base text-text-primary">
-            Warrior Profile & Metabolic Parameters
-          </h3>
-          <button
-            onClick={handleSaveProfile}
-            className="px-4 py-1.5 rounded-xl bg-accent-gold text-stone-950 font-bold text-xs shadow-sm cursor-pointer hover:bg-accent-gold-hover transition-colors"
-          >
-            {profileSaved ? "Saved!" : "Update Targets"}
-          </button>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="font-serif font-bold text-base text-text-primary">
+              Warrior Profile & Body Biometrics
+            </h3>
+            <p className="text-xs text-text-muted mt-0.5">
+              Physical attributes used to calculate resting metabolic rate and suggested targets.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/goals"
+              className="px-3 py-1.5 rounded-xl border border-accent-gold/40 text-accent-gold hover:bg-accent-gold/10 font-bold text-xs transition-colors flex items-center gap-1.5"
+            >
+              <Target className="w-3.5 h-3.5" />
+              <span>My Goals</span>
+            </Link>
+            <button
+              onClick={handleSaveProfile}
+              className="px-4 py-1.5 rounded-xl bg-accent-gold text-stone-950 font-bold text-xs shadow-sm cursor-pointer hover:bg-accent-gold-hover transition-colors"
+            >
+              {profileSaved ? "Saved!" : "Save Biometrics"}
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">

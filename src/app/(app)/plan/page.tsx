@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useProfile, useMeals, useSettings } from "@/lib/db/hooks";
+import { useProfile, useMeals, useSettings, useGoals } from "@/lib/db/hooks";
 import { AthenaIcon } from "@/components/gods";
 import {
   ChefHat,
@@ -51,6 +51,7 @@ interface QuickRecipe {
 
 export default function MealPlanPage() {
   const { profile } = useProfile();
+  const { targets } = useGoals();
   const { settings } = useSettings();
   const [todayStr, setTodayStr] = useState<string>("");
   const { addMeal } = useMeals(todayStr);
@@ -77,13 +78,6 @@ export default function MealPlanPage() {
   const [quickRecipes, setQuickRecipes] = useState<QuickRecipe[]>([]);
   const [isCooking, setIsCooking] = useState<boolean>(false);
 
-  const targets = profile?.targets || {
-    calories: 2000,
-    proteinG: 130,
-    carbsG: 220,
-    fatG: 60,
-    fiberG: 28,
-  };
 
   // Generate 1-Day Plan
   const handleGeneratePlan = async () => {

@@ -91,6 +91,38 @@ export interface DBSettings {
   updatedAt?: number;
 }
 
+export type GoalType =
+  | "lose_fat"
+  | "maintain"
+  | "build_muscle"
+  | "eat_healthier"
+  | "hydration"
+  | "custom";
+
+export interface DBGoal {
+  id: string;
+  name: string;
+  type: GoalType;
+  isActive: boolean;
+  targets: {
+    calories: number;
+    protein_g: number;
+    carbs_g: number;
+    fat_g: number;
+    fiber_g: number;
+    water_ml: number;
+  };
+  startWeightKg?: number;
+  targetWeightKg?: number;
+  targetDate?: string;
+  pace?: "gentle" | "standard";
+  notes?: string;
+  archived: boolean;
+  createdAt: number;
+  updatedAt: number;
+  deleted?: boolean;
+}
+
 export type XPEventType =
   | "meal"
   | "water"
@@ -99,7 +131,8 @@ export type XPEventType =
   | "full_day"
   | "swap"
   | "streak"
-  | "breakfast";
+  | "breakfast"
+  | "goal_created";
 
 export interface DBXPEvent {
   id: string;
@@ -113,6 +146,7 @@ export interface DBXPEvent {
 
 export const SYNCED_TABLES = [
   "profile",
+  "goals",
   "meals",
   "mealItems",
   "waterLogs",
@@ -126,6 +160,7 @@ export type SyncedTableName = (typeof SYNCED_TABLES)[number];
 
 export class AmbrosiaDatabase extends Dexie {
   profile!: Table<DBProfile, string>;
+  goals!: Table<DBGoal, string>;
   meals!: Table<DBMeal, string>;
   mealItems!: Table<DBMealItem, string>;
   waterLogs!: Table<DBWaterLog, string>;
@@ -194,6 +229,48 @@ export class AmbrosiaDatabase extends Dexie {
         await tx.table("settings").toCollection().modify((item: Record<string, unknown>) => {
           if (item.updatedAt === undefined) item.updatedAt = now;
         });
+      });
+
+    // Version 3 (Multiple Health Goals & Profile-to-Goal Migration)
+    this.version(3)
+      .stores({
+        goals: "id, isActive, type, archived, createdAt, updatedAt, deleted",
+      })
+      .upgrade(async (tx) => {
+        const now = Date.now();
+        try {
+          const profileTable = tx.table("profile");
+          const existingProfile = await profileTable.get("current");
+          if (existingProfile && existingProfile.targets && !existingProfile.deleted) {
+            const goalsTable = tx.table("goals");
+            const existingGoalCount = await goalsTable.count();
+            if (existingGoalCount === 0) {
+              await goalsTable.add({
+                id: "initial-goal",
+                name: "My first goal",
+                type: (existingProfile.goal as GoalType) || "maintain",
+                isActive: true,
+                targets: {
+                  calories: existingProfile.targets.calories ?? 2000,
+                  protein_g: existingProfile.targets.proteinG ?? 60,
+                  carbs_g: existingProfile.targets.carbsG ?? 250,
+                  fat_g: existingProfile.targets.fatG ?? 65,
+                  fiber_g: existingProfile.targets.fiberG ?? 25,
+                  water_ml: existingProfile.targets.waterMl ?? 2500,
+                },
+                startWeightKg: existingProfile.weightKg,
+                targetWeightKg: existingProfile.goalWeightKg,
+                pace: existingProfile.pace || "standard",
+                archived: false,
+                createdAt: existingProfile.createdAt || now,
+                updatedAt: now,
+                deleted: false,
+              });
+            }
+          }
+        } catch {
+          // ignore migration error if fresh
+        }
       });
 
     this.on("populate", () => {
