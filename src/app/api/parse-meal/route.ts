@@ -4,6 +4,7 @@ import {
   checkAIAccessLimits,
   getGeminiConfig,
   createGeminiClient,
+  generateContentWithFallback,
   cleanJsonOutput,
   errorResponse,
 } from "@/lib/gemini/server";
@@ -73,8 +74,7 @@ Return ONLY raw JSON conforming to this schema without markdown fences:
   ]
 }`;
 
-      const response = await ai.models.generateContent({
-        model,
+      const response = await generateContentWithFallback(ai, model, {
         contents: prompt,
       });
 

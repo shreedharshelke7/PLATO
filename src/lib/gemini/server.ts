@@ -119,13 +119,50 @@ export async function checkAIAccessLimits(req: NextRequest): Promise<AbuseCheckR
 export function getGeminiConfig(req: NextRequest) {
   const userKey = req.headers.get("x-user-key")?.trim();
   const apiKey = userKey || process.env.GEMINI_API_KEY?.trim();
-  const model = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
+  let model = process.env.GEMINI_MODEL?.trim() || "gemini-1.5-flash";
+
+  // Google Gemini API model normalization:
+  // "gemini-2.5-flash" does not exist in Google AI Studio and returns 404 (Not Found).
+  // Automatically normalize to Google's official stable vision model "gemini-1.5-flash".
+  if (model === "gemini-2.5-flash" || !model) {
+    model = "gemini-1.5-flash";
+  }
 
   return { apiKey, model, isUserKey: Boolean(userKey) };
 }
 
 export function createGeminiClient(apiKey: string) {
   return new GoogleGenAI({ apiKey });
+}
+
+/**
+ * Generate Gemini content with automatic fallback to gemini-1.5-flash
+ * if the primary model is not found, deprecated, or unavailable.
+ */
+export async function generateContentWithFallback(
+  ai: GoogleGenAI,
+  reqModel: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  contentsPayload: any
+) {
+  try {
+    return await ai.models.generateContent({
+      ...contentsPayload,
+      model: reqModel,
+    });
+  } catch (err: unknown) {
+    const errStr = String(err).toLowerCase();
+    if (
+      (errStr.includes("not found") || errStr.includes("404") || errStr.includes("unsupported")) &&
+      reqModel !== "gemini-1.5-flash"
+    ) {
+      return await ai.models.generateContent({
+        ...contentsPayload,
+        model: "gemini-1.5-flash",
+      });
+    }
+    throw err;
+  }
 }
 
 export function cleanJsonOutput(text: string): string {

@@ -4,6 +4,7 @@ import {
   checkAIAccessLimits,
   getGeminiConfig,
   createGeminiClient,
+  generateContentWithFallback,
   cleanJsonOutput,
   errorResponse,
 } from "@/lib/gemini/server";
@@ -67,8 +68,7 @@ Output strictly valid JSON:
   "focusForTomorrow": "One single priority for tomorrow"
 }`;
 
-      const response = await ai.models.generateContent({
-        model,
+      const response = await generateContentWithFallback(ai, model, {
         contents: prompt,
       });
 

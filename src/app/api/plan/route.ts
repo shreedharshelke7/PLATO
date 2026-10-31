@@ -4,6 +4,7 @@ import {
   checkAIAccessLimits,
   getGeminiConfig,
   createGeminiClient,
+  generateContentWithFallback,
   cleanJsonOutput,
   errorResponse,
 } from "@/lib/gemini/server";
@@ -89,7 +90,7 @@ Return raw JSON strictly conforming to this schema without markdown fences:
     }
   ]
 }`;
-        const response = await ai.models.generateContent({ model, contents: prompt });
+        const response = await generateContentWithFallback(ai, model, { contents: prompt });
         const cleaned = cleanJsonOutput(response.text || "");
         const parsed = JSON.parse(cleaned);
         const validated = QuickMealsResponseSchema.parse(parsed);

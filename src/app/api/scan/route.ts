@@ -4,6 +4,7 @@ import {
   checkAIAccessLimits,
   getGeminiConfig,
   createGeminiClient,
+  generateContentWithFallback,
   cleanJsonOutput,
   errorResponse,
 } from "@/lib/gemini/server";
@@ -135,8 +136,7 @@ CRITICAL RULES:
 3. Do not return markdown fences. Return ONLY the raw JSON string.`;
 
   try {
-    const response = await ai.models.generateContent({
-      model,
+    const response = await generateContentWithFallback(ai, model, {
       contents: [
         {
           role: "user",

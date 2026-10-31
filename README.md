@@ -56,8 +56,8 @@ Ambrosia gracefully degrades when API keys or credentials are not provided. The 
 
 | Variable | Type | Required? | Example Value | Description |
 |---|---|---|---|---|
-| `GEMINI_API_KEY` | String | Optional | `AIzaSyD...` | Server-side Google Gemini 2.5 Flash API key for photo meal scanning, Divine Swap generation, and Athena AI coaching. |
-| `GEMINI_MODEL` | String | Optional | `gemini-2.5-flash` | The Gemini model identifier. Defaults to `gemini-2.5-flash`. |
+| `GEMINI_API_KEY` | String | Optional | `AIzaSyD...` | Server-side Google Gemini Flash API key for photo meal scanning, Divine Swap generation, and Athena AI coaching. |
+| `GEMINI_MODEL` | String | Optional | `gemini-1.5-flash` | The Gemini model identifier. Defaults to `gemini-1.5-flash` (or `gemini-2.0-flash`). |
 | `NEXT_PUBLIC_SUPABASE_URL` | String | Optional | `https://xyz.supabase.co` | Your Supabase project URL. If omitted, app runs in standalone guest mode. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | String | Optional | `eyJhbGciOi...` | Supabase public anonymous API key for browser client authentication & sync. |
 
@@ -105,7 +105,7 @@ cp .env.example .env.local
 Fill in your credentials:
 ```env
 GEMINI_API_KEY=your_gemini_api_key
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-1.5-flash
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
@@ -196,7 +196,7 @@ for each row execute function public.touch_updated_at();
 2. Go to [vercel.com/new](https://vercel.com/new) and import the repository.
 3. In **Settings → Environment Variables**, add:
    * `GEMINI_API_KEY`: Your Gemini API key.
-   * `GEMINI_MODEL`: `gemini-2.5-flash`
+   * `GEMINI_MODEL`: `gemini-1.5-flash`
    * `NEXT_PUBLIC_SUPABASE_URL`: Your Supabase project URL.
    * `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Your Supabase anon key.
 4. Click **Deploy**. Vercel will build and deploy the app with automatic edge caching and PWA service workers.

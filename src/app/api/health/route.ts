@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getGeminiConfig, createGeminiClient, errorResponse } from "@/lib/gemini/server";
+import {
+  getGeminiConfig,
+  createGeminiClient,
+  generateContentWithFallback,
+  errorResponse,
+} from "@/lib/gemini/server";
 
 export const maxDuration = 30;
 
@@ -20,8 +25,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const ai = createGeminiClient(apiKey);
-    const response = await ai.models.generateContent({
-      model,
+    const response = await generateContentWithFallback(ai, model, {
       contents: "ping",
     });
     if (!response || !response.text) {
@@ -30,7 +34,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       valid: true,
-      message: "API key verified successfully with Gemini 2.5 Flash!",
+      message: "API key verified successfully with Gemini Flash!",
     });
   } catch (err: unknown) {
     const rawMsg = err instanceof Error ? err.message : String(err);
