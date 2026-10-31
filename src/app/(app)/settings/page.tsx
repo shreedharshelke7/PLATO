@@ -338,7 +338,7 @@ export default function SettingsPage() {
 
         <p className="text-xs text-text-secondary leading-relaxed">
           The app functions out of the box with manual food logging and bundled offline databases.
-          To use ultra-fast <strong>Groq LPU (Llama 3.2 Vision / Llama 3.3 70B)</strong> or <strong>Gemini Flash Vision</strong> for unlimited meal photo scanning and bypass all limits,
+          To use ultra-fast <strong>Groq LPU (openai/gpt-oss-120b &amp; Vision)</strong> or <strong>Gemini Flash Vision</strong> for unlimited meal photo scanning and bypass all limits,
           paste your free key from <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer" className="text-accent-gold underline">Groq Cloud</a> or <a href="https://aistudio.google.com" target="_blank" rel="noopener noreferrer" className="text-accent-gold underline">Google AI Studio</a>.
         </p>
 
